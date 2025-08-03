@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Peripeek Chrome Extension",
   "version": "1.0.0",
-  "description": "A Chrome extension that toggles between custom HTML and original URL",
+  "description": "A Chrome extension that opens a custom HTML page",
   "permissions": [
     "activeTab",
     "storage",
@@ -11,12 +11,14 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src *;"
+  },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Peripeek"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "sw.js"
   },
   "content_scripts": [
     {
@@ -26,7 +28,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["custom.html"],
+      "resources": ["custom.html", "custom.js"],
       "matches": ["<all_urls>"]
     }
   ],

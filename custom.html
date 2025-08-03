@@ -43,13 +43,85 @@
             opacity: 0.8;
             font-style: italic;
         }
+
+             /* The viewport is the fixed window through which we see the canvas */
+             #viewport {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background-color: #f0f0f0; /* A light gray background to see the canvas boundaries */
+            cursor: grab;
+        }
+
+        /* Add a "grabbing" cursor when panning */
+        #viewport.panning {
+            cursor: grabbing;
+        }
+
+        /* The canvas is the infinitely large surface that we pan and zoom */
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px; /* The canvas itself doesn't need a size */
+            height: 1px;
+            /* This is a performance hint for the browser */
+            will-change: transform; 
+            /* All transformations originate from the top-left corner */
+            transform-origin: 0 0;
+        }
+
+        /* Container for each iframe */
+        .iframe-container {
+            position: absolute;
+            width: 800px;
+            height: 600px;
+            background-color: white;
+            border: 2px solid #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            overflow: hidden; /* Hides iframe overflow */
+            resize: both; /* Allows users to resize the containers */
+        }
+        
+        .iframe-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #ffffff; /* Shows a white background while the iframe loads */
+        }
+
+        /* Info box to explain controls and potential issues */
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Peripeek Extension</h1>
-        <div class="subtitle">Your custom page is now active</div>
-        <div class="status">Click the extension icon again to return to the original page</div>
+
+    <div id="viewport">
+        <div id="canvas">
+            <!-- The iframe containers will be placed here -->
+        </div>
     </div>
+
+    <div class="info">
+        Controls:<br>
+        - Drag with mouse to pan the canvas<br>
+        - Use mouse wheel to zoom in/out<br>
+        - Iframes are resizable using the bottom-right corner<br>
+        Note: Some websites may not load due to security restrictions, even with modifications.
+    </div>
+
+    <script src="custom.js"></script>
 </body>
 </html> 

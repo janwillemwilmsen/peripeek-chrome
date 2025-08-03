@@ -72,3 +72,27 @@ chrome.runtime.onInstalled.addListener(async () => {
     console.error('Error restoring state:', error);
   }
 }); 
+
+const ruleId = 1;
+chrome.declarativeNetRequest.updateSessionRules({
+  removeRuleIds: [ruleId],
+  addRules: [{
+    id: ruleId,
+    priority: 1,
+    action: {
+      type: "modifyHeaders",
+      responseHeaders: [
+        { header: "x-frame-options", operation: "remove" },
+        { header: "content-security-policy", operation: "remove" },
+        { header: "cross-origin-embedder-policy", operation: "remove" },
+        { header: "cross-origin-opener-policy", operation: "remove" },
+        { header: "cross-origin-resource-policy", operation: "remove" },
+        { header: "content-security-policy-report-only", operation: "remove" }
+      ]
+    },
+    condition: {
+      resourceTypes: ["sub_frame"],
+      urlFilter: "*://*/*"
+    }
+  }]
+}); 
