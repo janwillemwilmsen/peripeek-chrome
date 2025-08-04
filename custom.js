@@ -16,12 +16,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- IFRAME DEFINITIONS ---
     const sites = [
-        { url: 'https://example.com', x: 0, y: 0 },
+        { url: 'https://tesla.com', x: 0, y: 0 },
         { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
         { url: 'https://snelste.nl', x: 0, y: 800 },
         { url: 'https://programmablebrowser.com', x: 1000, y: 800 },
         { url: 'https://www.energiedirect.nl', x: 2000, y: 0 },
-        { url: 'https://essent.nl', x: 3000, y: 0 }
+        { url: 'https://essent.nl', x: 3000, y: 0 },
+        { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
     ];
 
     // --- FUNCTION to apply transformations ---
@@ -56,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const iframe = document.createElement('iframe');
             iframe.src = site.url;
-            iframe.setAttribute('credentialless', '');
             iframe.style.width = '100%';
             iframe.style.height = '100%';
             iframe.style.border = 'none';

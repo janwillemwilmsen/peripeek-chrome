@@ -6,7 +6,10 @@
   "permissions": [
     "activeTab",
     "storage",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "cookies",
+    "webRequest",
+    "webRequestBlocking"
   ],
   "host_permissions": [
     "<all_urls>"

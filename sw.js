@@ -96,3 +96,25 @@ chrome.declarativeNetRequest.updateSessionRules({
     }
   }]
 }); 
+
+chrome.webRequest.onHeadersReceived.addListener(
+  (details) => {
+    if (details.type === 'sub_frame') {
+      details.responseHeaders.forEach(header => {
+        if (header.name.toLowerCase() === 'set-cookie') {
+          let cookieValue = header.value;
+          if (!cookieValue.includes('SameSite=')) {
+            cookieValue += '; SameSite=None';
+          }
+          if (!cookieValue.includes('Secure')) {
+            cookieValue += '; Secure';
+          }
+          header.value = cookieValue;
+        }
+      });
+    }
+    return { responseHeaders: details.responseHeaders };
+  },
+  { urls: ['<all_urls>'], types: ['sub_frame'] },
+  ['blocking', 'responseHeaders', 'extraHeaders']
+); 
