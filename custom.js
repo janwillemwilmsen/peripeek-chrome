@@ -6,14 +6,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('📋 Elements found:', { viewport: !!viewport, canvas: !!canvas });
 
-    // --- STATE MANAGEMENT ---
-    const state = {
-        pan: { x: 200, y: 150 }, // Initial pan
-        zoom: 0.5,             // Initial zoom
-        isPanning: false,
-        startPan: { x: 0, y: 0 }
+    // --- SETTINGS MANAGEMENT ---
+    const settings = {
+        currentWidth: 800,
+        currentHeight: 600,
+        applyToExisting: true,
+        presets: {
+            mobile: { width: 375, height: 667, name: 'Mobile (iPhone)' },
+            tablet: { width: 768, height: 1024, name: 'Tablet (iPad)' },
+            desktop: { width: 1200, height: 800, name: 'Desktop' }
+        }
     };
-    
+
+    // Get settings elements
+    const widthInput = document.getElementById('iframe-width');
+    const heightInput = document.getElementById('iframe-height');
+    const applySizeBtn = document.getElementById('apply-size');
+    const presetButtons = document.querySelectorAll('[data-preset]');
+    const applyAllBtn = document.getElementById('apply-all');
+    const applyNewBtn = document.getElementById('apply-new');
+
+    // --- STATE MANAGEMENT ---
+    // Removed manual state as Panzoom will handle it
+
     // --- IFRAME DEFINITIONS ---
          const sites = [
             { url: 'https://tesla.com', x: 0, y: 0 },
@@ -25,9 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
         ];
     // --- FUNCTION to apply transformations ---
-    const applyTransform = () => {
-        canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
-    };
+    // Removed manual applyTransform as Panzoom will handle it
 
     // --- FUNCTION to create and add iframes to the canvas ---
     const createIframes = () => {
@@ -38,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
             container.className = 'iframe-container';
             container.style.left = `${site.x}px`;
             container.style.top = `${site.y}px`;
+            container.style.width = `${settings.currentWidth}px`;
+            container.style.height = `${settings.currentHeight}px`;
             container.id = `container-${index}`;
 
             const loadingDiv = document.createElement('div');
@@ -76,199 +91,368 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingDiv.style.backgroundColor = 'rgba(244,67,54,0.8)';
             };
 
+            // Create custom resize handle
+            const resizeHandle = document.createElement('div');
+            resizeHandle.style.position = 'absolute';
+            resizeHandle.style.bottom = '0';
+            resizeHandle.style.right = '0';
+            resizeHandle.style.width = '20px';
+            resizeHandle.style.height = '20px';
+            resizeHandle.style.cursor = 'se-resize';
+            resizeHandle.style.backgroundColor = 'rgba(100,100,100,0.3)';
+            resizeHandle.style.borderLeft = '3px solid #666';
+            resizeHandle.style.borderTop = '3px solid #666';
+            resizeHandle.style.zIndex = '1000';
+            resizeHandle.className = 'resize-handle';
+
+            // Add resize functionality
+            let isResizing = false;
+            let startX, startY, startWidth, startHeight;
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = parseInt(window.getComputedStyle(container).width, 10);
+                startHeight = parseInt(window.getComputedStyle(container).height, 10);
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Prevent Panzoom from interfering
+                document.addEventListener('mousemove', handleResize);
+                document.addEventListener('mouseup', stopResize);
+            });
+
+            const handleResize = (e) => {
+                if (!isResizing) return;
+                const newWidth = startWidth + (e.clientX - startX);
+                const newHeight = startHeight + (e.clientY - startY);
+                // Only prevent negative sizes
+                if (newWidth > 0) container.style.width = newWidth + 'px';
+                if (newHeight > 0) container.style.height = newHeight + 'px';
+            };
+
+            const stopResize = () => {
+                isResizing = false;
+                document.removeEventListener('mousemove', handleResize);
+                document.removeEventListener('mouseup', stopResize);
+            };
+
             container.appendChild(iframe);
+            container.appendChild(resizeHandle);
             canvas.appendChild(container);
         });
     };
     
     // --- EVENT LISTENERS ---
+    // Removed manual event listeners as Panzoom will handle mouse events
 
-    // Keyboard controls for pan and zoom
-    document.addEventListener('keydown', (event) => {
-        // Check if we're focused on an input field
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-            return; // Don't interfere with typing
-        }
+    // --- INITIALIZATION ---
+    console.log('🎯 Starting initialization...');
+    createIframes();
 
-        const zoomStep = 0.15; // Zoom increment
-        const panStep = 50; // Pan distance in pixels
-        let handled = false;
+    // Check if Panzoom is available
+    console.log('Panzoom available:', typeof Panzoom);
+    if (typeof Panzoom === 'undefined') {
+        console.error('❌ Panzoom is not defined! Check if panzoom.min.js is loaded correctly.');
+        return;
+    }
 
-        switch (event.key) {
-            case '+':
-            case '=':
-                // Zoom in toward center of viewport
-                event.preventDefault();
-                handled = true;
-                smoothZoom(state.zoom * (1 + zoomStep));
-                break;
-            case '-':
-                // Zoom out from center of viewport
-                event.preventDefault();
-                handled = true;
-                smoothZoom(state.zoom * (1 - zoomStep));
-                break;
-            case 'ArrowUp':
-                event.preventDefault();
-                handled = true;
-                smoothPan(0, panStep);
-                break;
-            case 'ArrowDown':
-                event.preventDefault();
-                handled = true;
-                smoothPan(0, -panStep);
-                break;
-            case 'ArrowLeft':
-                event.preventDefault();
-                handled = true;
-                smoothPan(panStep, 0);
-                break;
-            case 'ArrowRight':
-                event.preventDefault();
-                handled = true;
-                smoothPan(-panStep, 0);
-                break;
-        }
-
-        if (handled) {
-            console.log(`Keyboard: ${event.key} - Zoom: ${state.zoom.toFixed(2)}, Pan: ${state.pan.x.toFixed(0)}, ${state.pan.y.toFixed(0)}`);
-        }
+    // Initialize Panzoom on the canvas
+    const panzoom = Panzoom(canvas, {
+        canvas: true,          // Enable canvas mode
+        minZoom: 0.1,          // Minimum zoom level
+        maxZoom: 10,           // Maximum zoom level
+        zoomSpeed: 0.65,      // Adjust zoom speed if needed
+        panOnlyWhenZoomed: false, // Allow panning at any zoom level
+        smoothScroll: true // Enables smoother wheel zooming (if supported)
     });
 
-    // Smooth pan function
-    const smoothPan = (deltaX, deltaY) => {
-        const startX = state.pan.x;
-        const startY = state.pan.y;
-        const targetX = startX + deltaX;
-        const targetY = startY + deltaY;
-        
-        animateTransform(startX, startY, state.zoom, targetX, targetY, state.zoom, 200);
-    };
+    console.log('Panzoom instance created:', panzoom);
+    console.log('Available methods:', Object.keys(panzoom));
 
-    // Smooth zoom function (zooms toward viewport center)
-    const smoothZoom = (targetZoom) => {
-        // Clamp zoom level
-        targetZoom = Math.max(0.1, Math.min(10, targetZoom));
-        
-        // Get viewport center
-        const viewportCenterX = viewport.clientWidth / 2;
-        const viewportCenterY = viewport.clientHeight / 2;
-        
-        // Calculate the point on the canvas that the center is pointing at
-        const pointX = (viewportCenterX - state.pan.x) / state.zoom;
-        const pointY = (viewportCenterY - state.pan.y) / state.zoom;
-        
-        // Calculate new pan position to keep the center point stationary
-        const targetX = viewportCenterX - pointX * targetZoom;
-        const targetY = viewportCenterY - pointY * targetZoom;
-        
-        animateTransform(state.pan.x, state.pan.y, state.zoom, targetX, targetY, targetZoom, 300);
-    };
-
-    // Smooth animation function
-    const animateTransform = (startX, startY, startZoom, targetX, targetY, targetZoom, duration) => {
-        const startTime = Date.now();
-        
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Easing function (ease-out)
-            const eased = 1 - Math.pow(1 - progress, 3);
-            
-            // Interpolate values
-            state.pan.x = startX + (targetX - startX) * eased;
-            state.pan.y = startY + (targetY - startY) * eased;
-            state.zoom = startZoom + (targetZoom - startZoom) * eased;
-            
-            applyTransform();
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            }
-        };
-        
-        requestAnimationFrame(animate);
-    };
-
-    // Mouse Down: Start panning
+    // Attach Panzoom to the viewport for mouse events
+    viewport.addEventListener('wheel', panzoom.zoomWithWheel);
+    
+    let isResizing = false;
+    
     viewport.addEventListener('mousedown', (event) => {
-        // Only pan with the left mouse button
-        if (event.button !== 0) return;
-        
-        state.isPanning = true;
-        viewport.classList.add('panning');
-        state.startPan.x = event.clientX - state.pan.x;
-        state.startPan.y = event.clientY - state.pan.y;
-
-        // Disable pointer events on ALL iframes during pan
-        document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-            iframe.style.pointerEvents = 'none';
-        });
+        if (event.button === 0) {
+            // Check if the mouse is over a resize handle or iframe container
+            const target = event.target;
+            const container = target.closest('.iframe-container');
+            
+            // If clicking on an iframe container, check if it's near the resize corner
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const isNearResizeCorner = (
+                    event.clientX > rect.right - 20 && 
+                    event.clientY > rect.bottom - 20
+                );
+                
+                // Don't start panning if user is trying to resize
+                if (isNearResizeCorner) {
+                    console.log('Resize handle clicked, skipping pan');
+                    isResizing = true;
+                    return;
+                }
+                
+                // If clicking on iframe content, don't pan
+                if (target.tagName === 'IFRAME' || target.closest('iframe')) {
+                    console.log('Iframe content clicked, skipping pan');
+                    return;
+                }
+            }
+            
+            // Only start panning if clicking on the viewport background
+            if (target === viewport || target === canvas) {
+                isResizing = false;
+                // Focus the viewport when clicking to enable keyboard controls
+                viewport.focus();
+                // Disable pointer events on iframes during pan
+                document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
+                    iframe.style.pointerEvents = 'none';
+                });
+                panzoom.handleDown(event);
+            }
+        }
     });
-
-    // Mouse Up: Stop panning
-    viewport.addEventListener('mouseup', () => {
-        state.isPanning = false;
-        viewport.classList.remove('panning');
-        
-        // Re-enable pointer events on iframes so they can be interacted with
+    
+    viewport.addEventListener('mousemove', (event) => {
+        if (!isResizing) {
+            panzoom.handleMove(event);
+        }
+    });
+    
+    viewport.addEventListener('mouseup', (event) => {
+        if (!isResizing) {
+            panzoom.handleUp(event);
+        }
+        isResizing = false;
+        // Re-enable pointer events on iframes
         document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
             iframe.style.pointerEvents = 'auto';
         });
     });
     
-    // Mouse Leave: Also stop panning if mouse leaves viewport
-    viewport.addEventListener('mouseleave', () => {
-        if (state.isPanning) {
-            state.isPanning = false;
-            viewport.classList.remove('panning');
-            document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-                iframe.style.pointerEvents = 'auto';
-            });
+    viewport.addEventListener('mouseleave', (event) => {
+        if (!isResizing) {
+            panzoom.handleUp(event);
+        }
+        isResizing = false;
+        // Re-enable pointer events on iframes
+        document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
+            iframe.style.pointerEvents = 'auto';
+        });
+    });
+
+    // Focus the viewport initially so keyboard controls work immediately
+    viewport.focus();
+
+    // Function to handle keyboard controls
+    const handleKeyboard = (event) => {
+        console.log('Key pressed:', event.key, 'on', event.target.tagName);
+        
+        const controlKeys = ['+', '=', '-', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (!controlKeys.includes(event.key)) return;
+        
+        // Prevent default behavior
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const currentZoom = panzoom.getScale();
+        const panStep = 50 / currentZoom;
+        
+        console.log('Processing key:', event.key, 'Current zoom:', currentZoom, 'Pan step:', panStep);
+
+        switch (event.key) {
+            case '+':
+            case '=':
+                console.log('Executing zoom in...');
+                // Zoom toward the center of the viewport
+                const viewportCenterX = viewport.clientWidth / 2;
+                const viewportCenterY = viewport.clientHeight / 2;
+                const currentScale = panzoom.getScale();
+                const newScale = Math.min(currentScale * 1.2, 10); // 20% zoom increase, max 10x
+                panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
+                break;
+            case '-':
+                console.log('Executing zoom out...');
+                // Zoom toward the center of the viewport
+                const viewportCenterX2 = viewport.clientWidth / 2;
+                const viewportCenterY2 = viewport.clientHeight / 2;
+                const currentScale2 = panzoom.getScale();
+                const newScale2 = Math.max(currentScale2 / 1.2, 0.1); // 20% zoom decrease, min 0.1x
+                panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
+                break;
+            case 'ArrowUp':
+                console.log('Executing pan up...');
+                panzoom.pan(0, panStep, { relative: true });
+                break;
+            case 'ArrowDown':
+                console.log('Executing pan down...');
+                panzoom.pan(0, -panStep, { relative: true });
+                break;
+            case 'ArrowLeft':
+                console.log('Executing pan left...');
+                panzoom.pan(panStep, 0, { relative: true });
+                break;
+            case 'ArrowRight':
+                console.log('Executing pan right...');
+                panzoom.pan(-panStep, 0, { relative: true });
+                break;
+        }
+    };
+
+    // Add keyboard listeners to both viewport and document for maximum coverage
+    viewport.addEventListener('keydown', handleKeyboard);
+    document.addEventListener('keydown', handleKeyboard);
+    window.addEventListener('keydown', handleKeyboard);
+
+    // Also add a click handler to ensure focus
+    viewport.addEventListener('click', (event) => {
+        console.log('Viewport clicked, focusing...');
+        viewport.focus();
+        event.stopPropagation();
+    });
+
+    // Test if keyboard is working by adding a simple test
+    console.log('Keyboard test: Press any key now...');
+    const testHandler = (e) => {
+        console.log('TEST: Key detected:', e.key);
+        document.removeEventListener('keydown', testHandler);
+    };
+    document.addEventListener('keydown', testHandler);
+
+    // Set initial zoom and pan
+    panzoom.zoom(0.5);
+    panzoom.pan(200, 150);
+
+    // Listen for messages from background for key presses
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        console.log('Message received:', message);
+        if (message.type === 'PANZOOM_KEY') {
+            const zoomStep = 0.1;
+            const currentZoom = panzoom.getScale();
+            const panStep = 50 / currentZoom;
+            let handled = true;
+            
+            console.log('Processing key from iframe:', message.key);
+            
+            switch (message.key) {
+                case '+':
+                case '=':
+                    console.log('Zooming in via message...');
+                    // Zoom toward the center of the viewport
+                    const viewportCenterX = viewport.clientWidth / 2;
+                    const viewportCenterY = viewport.clientHeight / 2;
+                    const currentScale = panzoom.getScale();
+                    const newScale = Math.min(currentScale * 1.2, 10);
+                    panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
+                    break;
+                case '-':
+                    console.log('Zooming out via message...');
+                    // Zoom toward the center of the viewport
+                    const viewportCenterX2 = viewport.clientWidth / 2;
+                    const viewportCenterY2 = viewport.clientHeight / 2;
+                    const currentScale2 = panzoom.getScale();
+                    const newScale2 = Math.max(currentScale2 / 1.2, 0.1);
+                    panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
+                    break;
+                case 'ArrowUp':
+                    console.log('Panning up via message...');
+                    panzoom.pan(0, panStep, { relative: true });
+                    break;
+                case 'ArrowDown':
+                    console.log('Panning down via message...');
+                    panzoom.pan(0, -panStep, { relative: true });
+                    break;
+                case 'ArrowLeft':
+                    console.log('Panning left via message...');
+                    panzoom.pan(panStep, 0, { relative: true });
+                    break;
+                case 'ArrowRight':
+                    console.log('Panning right via message...');
+                    panzoom.pan(-panStep, 0, { relative: true });
+                    break;
+                default:
+                    handled = false;
+            }
+            if (handled) {
+                // Optionally blur the active element to prevent further input
+                if (document.activeElement) document.activeElement.blur();
+            }
         }
     });
 
-    // Mouse Move: Pan the canvas
-    viewport.addEventListener('mousemove', (event) => {
-        if (!state.isPanning) return;
-        
-        state.pan.x = event.clientX - state.startPan.x;
-        state.pan.y = event.clientY - state.startPan.y;
-        applyTransform();
-    });
-
-    // Mouse Wheel: Zoom the canvas (towards the cursor) with smooth animation
-    viewport.addEventListener('wheel', (event) => {
-        event.preventDefault(); // Prevent default page scrolling
-
-        const zoomIntensity = 0.1;
-        const direction = event.deltaY > 0 ? -1 : 1;
-        
-        // Get mouse position relative to the viewport
-        const mouseX = event.clientX - viewport.getBoundingClientRect().left;
-        const mouseY = event.clientY - viewport.getBoundingClientRect().top;
-        
-        // Calculate the point on the canvas that the mouse is pointing at
-        const pointX = (mouseX - state.pan.x) / state.zoom;
-        const pointY = (mouseY - state.pan.y) / state.zoom;
-        
-        // Calculate new zoom level
-        const targetZoom = Math.max(0.1, Math.min(10, state.zoom * (1 + direction * zoomIntensity)));
-        
-        // Calculate the new pan position to keep the pointed-at location stationary
-        const targetX = mouseX - pointX * targetZoom;
-        const targetY = mouseY - pointY * targetZoom;
-
-        // Smooth animation to new position
-        animateTransform(state.pan.x, state.pan.y, state.zoom, targetX, targetY, targetZoom, 150);
-    });
-
-
-
-    // --- INITIALIZATION ---
-    console.log('🎯 Starting initialization...');
-    createIframes();
-    applyTransform();
     console.log('✅ Initialization complete');
+
+    // --- SETTINGS EVENT LISTENERS ---
+    
+    // Update current size when inputs change
+    widthInput.addEventListener('input', () => {
+        settings.currentWidth = parseInt(widthInput.value) || 800;
+    });
+    
+    heightInput.addEventListener('input', () => {
+        settings.currentHeight = parseInt(heightInput.value) || 600;
+    });
+
+    // Apply size to existing iframes
+    applySizeBtn.addEventListener('click', () => {
+        if (settings.applyToExisting) {
+            document.querySelectorAll('.iframe-container').forEach(container => {
+                container.style.width = settings.currentWidth + 'px';
+                container.style.height = settings.currentHeight + 'px';
+            });
+            console.log(`Applied size ${settings.currentWidth}x${settings.currentHeight} to all iframes`);
+        }
+    });
+
+    // Preset buttons
+    presetButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const presetName = button.dataset.preset;
+            const preset = settings.presets[presetName];
+            
+            if (preset) {
+                settings.currentWidth = preset.width;
+                settings.currentHeight = preset.height;
+                widthInput.value = preset.width;
+                heightInput.value = preset.height;
+                
+                // Update active button
+                presetButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Apply to existing iframes if enabled
+                if (settings.applyToExisting) {
+                    document.querySelectorAll('.iframe-container').forEach(container => {
+                        container.style.width = preset.width + 'px';
+                        container.style.height = preset.height + 'px';
+                    });
+                }
+                
+                console.log(`Applied ${preset.name} preset: ${preset.width}x${preset.height}`);
+            }
+        });
+    });
+
+    // Apply mode buttons
+    applyAllBtn.addEventListener('click', () => {
+        settings.applyToExisting = true;
+        applyAllBtn.classList.add('active');
+        applyNewBtn.classList.remove('active');
+        console.log('Mode: Apply to all iframes');
+    });
+
+    applyNewBtn.addEventListener('click', () => {
+        settings.applyToExisting = false;
+        applyNewBtn.classList.add('active');
+        applyAllBtn.classList.remove('active');
+        console.log('Mode: Apply to new iframes only');
+    });
+
+    // Set initial mode
+    applyAllBtn.classList.add('active');
 }); 
