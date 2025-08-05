@@ -3,6 +3,20 @@
 
 console.log('Peripeek extension content script loaded');
 
+// Keyboard event listener for pan/zoom keys
+document.addEventListener('keydown', (event) => {
+  const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '+', '=', '-'];
+  if (keys.includes(event.key)) {
+    // Prevent default behavior in iframe
+    event.preventDefault();
+    // Send message to background
+    chrome.runtime.sendMessage({
+      type: 'PANZOOM_KEY',
+      key: event.key
+    });
+  }
+});
+
 // You can add any page-specific functionality here
 // For example, detecting when the user is on the custom page
 if (window.location.href.includes('custom.html')) {

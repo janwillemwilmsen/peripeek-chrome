@@ -73,6 +73,21 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 }); 
 
+// Listen for messages from content scripts
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'PANZOOM_KEY') {
+    // Forward to the custom page tab
+    chrome.storage.local.get('tabId', (data) => {
+      if (data.tabId) {
+        chrome.tabs.sendMessage(data.tabId, {
+          type: 'PANZOOM_KEY',
+          key: message.key
+        });
+      }
+    });
+  }
+});
+
 const ruleId = 1;
 chrome.declarativeNetRequest.updateSessionRules({
   removeRuleIds: [ruleId],
