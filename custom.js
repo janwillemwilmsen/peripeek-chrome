@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentWidth: 800,
         currentHeight: 600,
         applyToExisting: true,
+        autoLayoutOnResize: true,
         presets: {
             mobile: { width: 375, height: 667, name: 'Mobile (iPhone)' },
             tablet: { width: 768, height: 1024, name: 'Tablet (iPad)' },
@@ -25,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const presetButtons = document.querySelectorAll('[data-preset]');
     const applyAllBtn = document.getElementById('apply-all');
     const applyNewBtn = document.getElementById('apply-new');
+    const autoLayoutBtn = document.getElementById('auto-layout');
+    const autoLayoutToggle = document.getElementById('auto-layout-toggle');
 
     // --- STATE MANAGEMENT ---
     // Removed manual state as Panzoom will handle it
@@ -142,6 +145,47 @@ document.addEventListener('DOMContentLoaded', () => {
             container.appendChild(resizeHandle);
             canvas.appendChild(container);
         });
+    };
+
+    // --- AUTO-LAYOUT FUNCTION ---
+    const autoLayoutIframes = () => {
+        console.log('🔧 Auto-layouting iframes...');
+        
+        const containers = document.querySelectorAll('.iframe-container');
+        if (containers.length === 0) return;
+        
+        const padding = 50; // Space between iframes
+        const maxColumns = 3; // Maximum iframes per row
+        let currentX = 0;
+        let currentY = 0;
+        let maxHeightInRow = 0;
+        let itemsInCurrentRow = 0;
+        
+        containers.forEach((container, index) => {
+            const width = parseInt(container.style.width) || settings.currentWidth;
+            const height = parseInt(container.style.height) || settings.currentHeight;
+            
+            // Check if we need to start a new row
+            if (itemsInCurrentRow >= maxColumns) {
+                currentX = 0;
+                currentY += maxHeightInRow + padding;
+                maxHeightInRow = 0;
+                itemsInCurrentRow = 0;
+            }
+            
+            // Position the iframe
+            container.style.left = currentX + 'px';
+            container.style.top = currentY + 'px';
+            
+            // Update position for next iframe
+            currentX += width + padding;
+            maxHeightInRow = Math.max(maxHeightInRow, height);
+            itemsInCurrentRow++;
+            
+            console.log(`Positioned iframe ${index}: x=${container.style.left}, y=${container.style.top}`);
+        });
+        
+        console.log('✅ Auto-layout complete');
     };
     
     // --- EVENT LISTENERS ---
@@ -406,6 +450,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.style.height = settings.currentHeight + 'px';
             });
             console.log(`Applied size ${settings.currentWidth}x${settings.currentHeight} to all iframes`);
+            // Auto-layout after size change to prevent overlaps (if enabled)
+            if (settings.autoLayoutOnResize) {
+                autoLayoutIframes();
+            }
         }
     });
 
@@ -431,6 +479,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         container.style.width = preset.width + 'px';
                         container.style.height = preset.height + 'px';
                     });
+                    // Auto-layout after preset change to prevent overlaps (if enabled)
+                    if (settings.autoLayoutOnResize) {
+                        autoLayoutIframes();
+                    }
                 }
                 
                 console.log(`Applied ${preset.name} preset: ${preset.width}x${preset.height}`);
@@ -451,6 +503,18 @@ document.addEventListener('DOMContentLoaded', () => {
         applyNewBtn.classList.add('active');
         applyAllBtn.classList.remove('active');
         console.log('Mode: Apply to new iframes only');
+    });
+
+    // Auto-layout button
+    autoLayoutBtn.addEventListener('click', () => {
+        autoLayoutIframes();
+    });
+
+    // Auto-layout toggle
+    autoLayoutToggle.addEventListener('click', () => {
+        settings.autoLayoutOnResize = !settings.autoLayoutOnResize;
+        autoLayoutToggle.classList.toggle('active', settings.autoLayoutOnResize);
+        console.log(`Auto-layout on resize: ${settings.autoLayoutOnResize ? 'enabled' : 'disabled'}`);
     });
 
     // Set initial mode
