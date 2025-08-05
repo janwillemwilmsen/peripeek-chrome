@@ -94,6 +94,34 @@
             background-color: rgba(100,100,100,0.6);
         }
         
+        /* Remove old drag cursor - now handled by drag handle */
+        
+        .resize-handle {
+            cursor: se-resize !important; /* Ensure resize cursor takes priority */
+        }
+        
+        /* Drag handle styling */
+        .drag-handle {
+            background: linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(0,0,0,0.1)) !important;
+            border-bottom: 1px solid rgba(0,0,0,0.2) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: rgba(0,0,0,0.6);
+            user-select: none;
+        }
+        
+        .drag-handle:hover {
+            background: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.15)) !important;
+        }
+        
+        .drag-handle::after {
+            content: "⋮⋮ Drag to move ⋮⋮";
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        
         /* Settings bezel at the top */
         .settings-bezel {
             position: fixed;
@@ -232,16 +260,14 @@
     <div class="info">
         Controls:<br>
         - Click on background first to focus for keyboard controls<br>
-        - Drag with mouse to pan the canvas<br>
+        - Drag background to pan the canvas<br>
+        - Drag iframe containers to move them around<br>
         - Use mouse wheel to zoom in/out<br>
         - Use + / - keys to zoom in/out<br>
         - Use arrow keys to pan around<br>
         - Iframes are resizable using the bottom-right corner<br>
         Note: Some websites may not load due to security restrictions, even with modifications.
     </div>
-
-    <!-- Add Panzoom library -->
-    <script src="panzoom.min.js"></script>
 
     <script src="custom.js"></script>
 </body>

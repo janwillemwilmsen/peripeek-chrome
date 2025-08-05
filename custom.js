@@ -29,35 +29,94 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoLayoutBtn = document.getElementById('auto-layout');
     const autoLayoutToggle = document.getElementById('auto-layout-toggle');
 
-    // --- STATE MANAGEMENT ---
-    // Removed manual state as Panzoom will handle it
+    // --- NATIVE ZOOM & PAN STATE ---
+    let transform = {
+        x: 0,
+        y: 0,
+        scale: 0.5
+    };
+
+    let isPanning = false;
+    let lastPanPoint = { x: 0, y: 0 };
+    let isDragging = false;
+    let isResizing = false;
 
     // --- IFRAME DEFINITIONS ---
-         const sites = [
-            { url: 'https://tesla.com', x: 0, y: 0 },
-            { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
-            { url: 'https://snelste.nl', x: 0, y: 800 },
-            { url: 'https://programmablebrowser.com', x: 1000, y: 800 },
-            { url: 'https://www.energiedirect.nl', x: 2000, y: 0 },
-            { url: 'https://essent.nl', x: 3000, y: 0 },
-            { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
-        ];
-    // --- FUNCTION to apply transformations ---
-    // Removed manual applyTransform as Panzoom will handle it
+    const sites = [
+        { url: 'https://tesla.com', x: 0, y: 0 },
+        { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
+        { url: 'https://snelste.nl', x: 0, y: 800 },
+        { url: 'https://programmablebrowser.com', x: 1000, y: 800 },
+        { url: 'https://www.energiedirect.nl', x: 2000, y: 0 },
+        { url: 'https://essent.nl', x: 3000, y: 0 },
+        { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
+    ];
 
-    // --- FUNCTION to create and add iframes to the canvas ---
+    // --- NATIVE TRANSFORM FUNCTION ---
+    const applyTransform = () => {
+        const transformString = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`;
+        canvas.style.transform = transformString;
+        console.log('Applied transform:', transformString);
+    };
+
+    // --- NATIVE ZOOM FUNCTIONS ---
+    const zoomIn = () => {
+        transform.scale = Math.min(transform.scale * 1.2, 5);
+        applyTransform();
+    };
+
+    const zoomOut = () => {
+        transform.scale = Math.max(transform.scale / 1.2, 0.1);
+        applyTransform();
+    };
+
+    const zoomToPoint = (delta, point) => {
+        const oldScale = transform.scale;
+        const newScale = delta > 0 ? 
+            Math.min(oldScale * 1.1, 5) : 
+            Math.max(oldScale / 1.1, 0.1);
+        
+        if (newScale !== oldScale) {
+            const rect = viewport.getBoundingClientRect();
+            const offsetX = point.x - rect.left;
+            const offsetY = point.y - rect.top;
+            
+            // Calculate new transform to zoom toward mouse point
+            transform.x = offsetX - (offsetX - transform.x) * (newScale / oldScale);
+            transform.y = offsetY - (offsetY - transform.y) * (newScale / oldScale);
+            transform.scale = newScale;
+            
+            applyTransform();
+        }
+    };
+
+    // --- NATIVE PAN FUNCTIONS ---
+    const panBy = (deltaX, deltaY) => {
+        transform.x += deltaX;
+        transform.y += deltaY;
+        applyTransform();
+    };
+
+    // --- IFRAME CREATION WITH NATIVE DRAG & RESIZE ---
     const createIframes = () => {
         console.log('🌐 Creating iframes for sites:', sites);
         
         sites.forEach((site, index) => {
             const container = document.createElement('div');
             container.className = 'iframe-container';
+            container.style.position = 'absolute';
             container.style.left = `${site.x}px`;
             container.style.top = `${site.y}px`;
             container.style.width = `${settings.currentWidth}px`;
             container.style.height = `${settings.currentHeight}px`;
+            container.style.backgroundColor = 'white';
+            container.style.border = '2px solid #333';
+            container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+            container.style.borderRadius = '8px';
+            container.style.overflow = 'hidden';
             container.id = `container-${index}`;
 
+            // Loading indicator
             const loadingDiv = document.createElement('div');
             loadingDiv.style.position = 'absolute';
             loadingDiv.style.top = '10px';
@@ -69,9 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingDiv.style.fontSize = '12px';
             loadingDiv.style.zIndex = '10';
             loadingDiv.textContent = 'Loading...';
-            
             container.appendChild(loadingDiv);
 
+            // Create iframe
             const iframe = document.createElement('iframe');
             iframe.src = site.url;
             iframe.style.width = '100%';
@@ -94,7 +153,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingDiv.style.backgroundColor = 'rgba(244,67,54,0.8)';
             };
 
-            // Create custom resize handle
+            // Create drag handle
+            const dragHandle = document.createElement('div');
+            dragHandle.style.position = 'absolute';
+            dragHandle.style.top = '0';
+            dragHandle.style.left = '0';
+            dragHandle.style.right = '0';
+            dragHandle.style.height = '25px';
+            dragHandle.style.backgroundColor = 'rgba(0,0,0,0.1)';
+            dragHandle.style.cursor = 'grab';
+            dragHandle.style.borderBottom = '1px solid rgba(0,0,0,0.2)';
+            dragHandle.style.display = 'flex';
+            dragHandle.style.alignItems = 'center';
+            dragHandle.style.justifyContent = 'center';
+            dragHandle.style.fontSize = '10px';
+            dragHandle.style.color = 'rgba(0,0,0,0.6)';
+            dragHandle.style.userSelect = 'none';
+            dragHandle.style.zIndex = '1001';
+            dragHandle.textContent = '⋮⋮ Drag to move ⋮⋮';
+            dragHandle.className = 'drag-handle';
+
+            // Adjust iframe for drag handle
+            iframe.style.marginTop = '25px';
+            iframe.style.height = 'calc(100% - 25px)';
+
+            // Create resize handle
             const resizeHandle = document.createElement('div');
             resizeHandle.style.position = 'absolute';
             resizeHandle.style.bottom = '0';
@@ -102,46 +185,98 @@ document.addEventListener('DOMContentLoaded', () => {
             resizeHandle.style.width = '20px';
             resizeHandle.style.height = '20px';
             resizeHandle.style.cursor = 'se-resize';
-            resizeHandle.style.backgroundColor = 'rgba(100,100,100,0.3)';
+            resizeHandle.style.backgroundColor = 'rgba(100,100,100,0.5)';
             resizeHandle.style.borderLeft = '3px solid #666';
             resizeHandle.style.borderTop = '3px solid #666';
-            resizeHandle.style.zIndex = '1000';
+            resizeHandle.style.zIndex = '1002';
             resizeHandle.className = 'resize-handle';
 
-            // Add resize functionality
-            let isResizing = false;
-            let startX, startY, startWidth, startHeight;
+            // --- DRAG FUNCTIONALITY ---
+            let dragState = null;
 
-            resizeHandle.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                startWidth = parseInt(window.getComputedStyle(container).width, 10);
-                startHeight = parseInt(window.getComputedStyle(container).height, 10);
+            dragHandle.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // Prevent Panzoom from interfering
-                document.addEventListener('mousemove', handleResize);
-                document.addEventListener('mouseup', stopResize);
+                isDragging = true;
+                dragState = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startLeft: parseInt(container.style.left),
+                    startTop: parseInt(container.style.top)
+                };
+
+                dragHandle.style.cursor = 'grabbing';
+                container.style.zIndex = '1001';
+                container.style.opacity = '0.9';
+                iframe.style.pointerEvents = 'none';
+
+                console.log(`Started dragging iframe ${index}`);
             });
 
-            const handleResize = (e) => {
-                if (!isResizing) return;
-                const newWidth = startWidth + (e.clientX - startX);
-                const newHeight = startHeight + (e.clientY - startY);
-                // Only prevent negative sizes
-                if (newWidth > 0) container.style.width = newWidth + 'px';
-                if (newHeight > 0) container.style.height = newHeight + 'px';
-            };
+            // --- RESIZE FUNCTIONALITY ---
+            let resizeState = null;
 
-            const stopResize = () => {
-                isResizing = false;
-                document.removeEventListener('mousemove', handleResize);
-                document.removeEventListener('mouseup', stopResize);
-            };
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                isResizing = true;
+                resizeState = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startWidth: parseInt(container.style.width),
+                    startHeight: parseInt(container.style.height)
+                };
+
+                console.log(`Started resizing iframe ${index}`);
+            });
+
+            // Global mouse handlers for this iframe's drag and resize
+            document.addEventListener('mousemove', (e) => {
+                if (dragState && isDragging) {
+                    const deltaX = (e.clientX - dragState.startX) / transform.scale;
+                    const deltaY = (e.clientY - dragState.startY) / transform.scale;
+                    
+                    container.style.left = (dragState.startLeft + deltaX) + 'px';
+                    container.style.top = (dragState.startTop + deltaY) + 'px';
+                }
+                
+                if (resizeState && isResizing) {
+                    const deltaX = e.clientX - resizeState.startX;
+                    const deltaY = e.clientY - resizeState.startY;
+                    
+                    const newWidth = Math.max(200, resizeState.startWidth + deltaX);
+                    const newHeight = Math.max(150, resizeState.startHeight + deltaY);
+                    
+                    container.style.width = newWidth + 'px';
+                    container.style.height = newHeight + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (dragState && isDragging) {
+                    isDragging = false;
+                    dragState = null;
+                    
+                    dragHandle.style.cursor = 'grab';
+                    container.style.zIndex = '1000';
+                    container.style.opacity = '1';
+                    iframe.style.pointerEvents = 'auto';
+                    
+                    console.log(`Finished dragging iframe ${index}`);
+                }
+                
+                if (resizeState && isResizing) {
+                    isResizing = false;
+                    resizeState = null;
+                    
+                    console.log(`Finished resizing iframe ${index}`);
+                }
+            });
 
             container.appendChild(iframe);
+            container.appendChild(dragHandle);
             container.appendChild(resizeHandle);
             canvas.appendChild(container);
         });
@@ -154,8 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const containers = document.querySelectorAll('.iframe-container');
         if (containers.length === 0) return;
         
-        const padding = 50; // Space between iframes
-        const maxColumns = 3; // Maximum iframes per row
+        const padding = 50;
+        const maxColumns = 3;
         let currentX = 0;
         let currentY = 0;
         let maxHeightInRow = 0;
@@ -165,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const width = parseInt(container.style.width) || settings.currentWidth;
             const height = parseInt(container.style.height) || settings.currentHeight;
             
-            // Check if we need to start a new row
             if (itemsInCurrentRow >= maxColumns) {
                 currentX = 0;
                 currentY += maxHeightInRow + padding;
@@ -173,11 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 itemsInCurrentRow = 0;
             }
             
-            // Position the iframe
             container.style.left = currentX + 'px';
             container.style.top = currentY + 'px';
             
-            // Update position for next iframe
             currentX += width + padding;
             maxHeightInRow = Math.max(maxHeightInRow, height);
             itemsInCurrentRow++;
@@ -187,249 +319,80 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('✅ Auto-layout complete');
     };
-    
-    // --- EVENT LISTENERS ---
-    // Removed manual event listeners as Panzoom will handle mouse events
 
-    // --- INITIALIZATION ---
-    console.log('🎯 Starting initialization...');
-    createIframes();
-
-    // Check if Panzoom is available
-    console.log('Panzoom available:', typeof Panzoom);
-    if (typeof Panzoom === 'undefined') {
-        console.error('❌ Panzoom is not defined! Check if panzoom.min.js is loaded correctly.');
-        return;
-    }
-
-    // Initialize Panzoom on the canvas
-    const panzoom = Panzoom(canvas, {
-        canvas: true,          // Enable canvas mode
-        minZoom: 0.1,          // Minimum zoom level
-        maxZoom: 10,           // Maximum zoom level
-        zoomSpeed: 0.65,      // Adjust zoom speed if needed
-        panOnlyWhenZoomed: false, // Allow panning at any zoom level
-        smoothScroll: true // Enables smoother wheel zooming (if supported)
-    });
-
-    console.log('Panzoom instance created:', panzoom);
-    console.log('Available methods:', Object.keys(panzoom));
-
-    // Attach Panzoom to the viewport for mouse events
-    viewport.addEventListener('wheel', panzoom.zoomWithWheel);
-    
-    let isResizing = false;
-    
-    viewport.addEventListener('mousedown', (event) => {
-        if (event.button === 0) {
-            // Check if the mouse is over a resize handle or iframe container
-            const target = event.target;
-            const container = target.closest('.iframe-container');
-            
-            // If clicking on an iframe container, check if it's near the resize corner
-            if (container) {
-                const rect = container.getBoundingClientRect();
-                const isNearResizeCorner = (
-                    event.clientX > rect.right - 20 && 
-                    event.clientY > rect.bottom - 20
-                );
-                
-                // Don't start panning if user is trying to resize
-                if (isNearResizeCorner) {
-                    console.log('Resize handle clicked, skipping pan');
-                    isResizing = true;
-                    return;
-                }
-                
-                // If clicking on iframe content, don't pan
-                if (target.tagName === 'IFRAME' || target.closest('iframe')) {
-                    console.log('Iframe content clicked, skipping pan');
-                    return;
-                }
-            }
-            
-            // Only start panning if clicking on the viewport background
-            if (target === viewport || target === canvas) {
-                isResizing = false;
-                // Focus the viewport when clicking to enable keyboard controls
-                viewport.focus();
-                // Disable pointer events on iframes during pan
-                document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-                    iframe.style.pointerEvents = 'none';
-                });
-                panzoom.handleDown(event);
+    // --- VIEWPORT EVENT HANDLERS ---
+    viewport.addEventListener('mousedown', (e) => {
+        if (e.target === viewport || e.target === canvas) {
+            if (!isDragging && !isResizing) {
+                isPanning = true;
+                lastPanPoint = { x: e.clientX, y: e.clientY };
+                viewport.style.cursor = 'grabbing';
+                e.preventDefault();
             }
         }
     });
-    
-    viewport.addEventListener('mousemove', (event) => {
-        if (!isResizing) {
-            panzoom.handleMove(event);
+
+    viewport.addEventListener('mousemove', (e) => {
+        if (isPanning && !isDragging && !isResizing) {
+            const deltaX = e.clientX - lastPanPoint.x;
+            const deltaY = e.clientY - lastPanPoint.y;
+            
+            panBy(deltaX, deltaY);
+            
+            lastPanPoint = { x: e.clientX, y: e.clientY };
         }
     });
-    
-    viewport.addEventListener('mouseup', (event) => {
-        if (!isResizing) {
-            panzoom.handleUp(event);
+
+    viewport.addEventListener('mouseup', () => {
+        if (isPanning) {
+            isPanning = false;
+            viewport.style.cursor = 'grab';
         }
-        isResizing = false;
-        // Re-enable pointer events on iframes
-        document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-            iframe.style.pointerEvents = 'auto';
-        });
-    });
-    
-    viewport.addEventListener('mouseleave', (event) => {
-        if (!isResizing) {
-            panzoom.handleUp(event);
-        }
-        isResizing = false;
-        // Re-enable pointer events on iframes
-        document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-            iframe.style.pointerEvents = 'auto';
-        });
     });
 
-    // Focus the viewport initially so keyboard controls work immediately
-    viewport.focus();
+    viewport.addEventListener('mouseleave', () => {
+        if (isPanning) {
+            isPanning = false;
+            viewport.style.cursor = 'grab';
+        }
+    });
 
-    // Function to handle keyboard controls
-    const handleKeyboard = (event) => {
-        console.log('Key pressed:', event.key, 'on', event.target.tagName);
-        
-        const controlKeys = ['+', '=', '-', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-        if (!controlKeys.includes(event.key)) return;
-        
-        // Prevent default behavior
-        event.preventDefault();
-        event.stopPropagation();
-        
-        const currentZoom = panzoom.getScale();
-        const panStep = 50 / currentZoom;
-        
-        console.log('Processing key:', event.key, 'Current zoom:', currentZoom, 'Pan step:', panStep);
+    // Mouse wheel zoom
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoomToPoint(e.deltaY, { x: e.clientX, y: e.clientY });
+    });
 
-        switch (event.key) {
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+        switch(e.key) {
             case '+':
             case '=':
-                console.log('Executing zoom in...');
-                // Zoom toward the center of the viewport
-                const viewportCenterX = viewport.clientWidth / 2;
-                const viewportCenterY = viewport.clientHeight / 2;
-                const currentScale = panzoom.getScale();
-                const newScale = Math.min(currentScale * 1.2, 10); // 20% zoom increase, max 10x
-                panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
+                e.preventDefault();
+                zoomIn();
                 break;
             case '-':
-                console.log('Executing zoom out...');
-                // Zoom toward the center of the viewport
-                const viewportCenterX2 = viewport.clientWidth / 2;
-                const viewportCenterY2 = viewport.clientHeight / 2;
-                const currentScale2 = panzoom.getScale();
-                const newScale2 = Math.max(currentScale2 / 1.2, 0.1); // 20% zoom decrease, min 0.1x
-                panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
+                e.preventDefault();
+                zoomOut();
                 break;
             case 'ArrowUp':
-                console.log('Executing pan up...');
-                panzoom.pan(0, panStep, { relative: true });
+                e.preventDefault();
+                panBy(0, 50);
                 break;
             case 'ArrowDown':
-                console.log('Executing pan down...');
-                panzoom.pan(0, -panStep, { relative: true });
+                e.preventDefault();
+                panBy(0, -50);
                 break;
             case 'ArrowLeft':
-                console.log('Executing pan left...');
-                panzoom.pan(panStep, 0, { relative: true });
+                e.preventDefault();
+                panBy(50, 0);
                 break;
             case 'ArrowRight':
-                console.log('Executing pan right...');
-                panzoom.pan(-panStep, 0, { relative: true });
+                e.preventDefault();
+                panBy(-50, 0);
                 break;
         }
-    };
-
-    // Add keyboard listeners to both viewport and document for maximum coverage
-    viewport.addEventListener('keydown', handleKeyboard);
-    document.addEventListener('keydown', handleKeyboard);
-    window.addEventListener('keydown', handleKeyboard);
-
-    // Also add a click handler to ensure focus
-    viewport.addEventListener('click', (event) => {
-        console.log('Viewport clicked, focusing...');
-        viewport.focus();
-        event.stopPropagation();
     });
-
-    // Test if keyboard is working by adding a simple test
-    console.log('Keyboard test: Press any key now...');
-    const testHandler = (e) => {
-        console.log('TEST: Key detected:', e.key);
-        document.removeEventListener('keydown', testHandler);
-    };
-    document.addEventListener('keydown', testHandler);
-
-    // Set initial zoom and pan
-    panzoom.zoom(0.5);
-    panzoom.pan(200, 150);
-
-    // Listen for messages from background for key presses
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        console.log('Message received:', message);
-        if (message.type === 'PANZOOM_KEY') {
-            const zoomStep = 0.1;
-            const currentZoom = panzoom.getScale();
-            const panStep = 50 / currentZoom;
-            let handled = true;
-            
-            console.log('Processing key from iframe:', message.key);
-            
-            switch (message.key) {
-                case '+':
-                case '=':
-                    console.log('Zooming in via message...');
-                    // Zoom toward the center of the viewport
-                    const viewportCenterX = viewport.clientWidth / 2;
-                    const viewportCenterY = viewport.clientHeight / 2;
-                    const currentScale = panzoom.getScale();
-                    const newScale = Math.min(currentScale * 1.2, 10);
-                    panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
-                    break;
-                case '-':
-                    console.log('Zooming out via message...');
-                    // Zoom toward the center of the viewport
-                    const viewportCenterX2 = viewport.clientWidth / 2;
-                    const viewportCenterY2 = viewport.clientHeight / 2;
-                    const currentScale2 = panzoom.getScale();
-                    const newScale2 = Math.max(currentScale2 / 1.2, 0.1);
-                    panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
-                    break;
-                case 'ArrowUp':
-                    console.log('Panning up via message...');
-                    panzoom.pan(0, panStep, { relative: true });
-                    break;
-                case 'ArrowDown':
-                    console.log('Panning down via message...');
-                    panzoom.pan(0, -panStep, { relative: true });
-                    break;
-                case 'ArrowLeft':
-                    console.log('Panning left via message...');
-                    panzoom.pan(panStep, 0, { relative: true });
-                    break;
-                case 'ArrowRight':
-                    console.log('Panning right via message...');
-                    panzoom.pan(-panStep, 0, { relative: true });
-                    break;
-                default:
-                    handled = false;
-            }
-            if (handled) {
-                // Optionally blur the active element to prevent further input
-                if (document.activeElement) document.activeElement.blur();
-            }
-        }
-    });
-
-    console.log('✅ Initialization complete');
 
     // --- SETTINGS EVENT LISTENERS ---
     
@@ -450,7 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.style.height = settings.currentHeight + 'px';
             });
             console.log(`Applied size ${settings.currentWidth}x${settings.currentHeight} to all iframes`);
-            // Auto-layout after size change to prevent overlaps (if enabled)
             if (settings.autoLayoutOnResize) {
                 autoLayoutIframes();
             }
@@ -469,17 +431,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 widthInput.value = preset.width;
                 heightInput.value = preset.height;
                 
-                // Update active button
                 presetButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 
-                // Apply to existing iframes if enabled
                 if (settings.applyToExisting) {
                     document.querySelectorAll('.iframe-container').forEach(container => {
                         container.style.width = preset.width + 'px';
                         container.style.height = preset.height + 'px';
                     });
-                    // Auto-layout after preset change to prevent overlaps (if enabled)
                     if (settings.autoLayoutOnResize) {
                         autoLayoutIframes();
                     }
@@ -517,6 +476,18 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Auto-layout on resize: ${settings.autoLayoutOnResize ? 'enabled' : 'disabled'}`);
     });
 
+    // --- INITIALIZATION ---
+    console.log('🎯 Starting initialization...');
+    createIframes();
+    
+    // Set initial transform
+    transform.x = 200;
+    transform.y = 150;
+    applyTransform();
+
     // Set initial mode
     applyAllBtn.classList.add('active');
+    viewport.style.cursor = 'grab';
+
+    console.log('✅ Native JavaScript initialization complete');
 }); 
