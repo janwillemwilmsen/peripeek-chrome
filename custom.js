@@ -15,16 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- IFRAME DEFINITIONS ---
-    const sites = [
-        { url: 'https://tesla.com', x: 0, y: 0 },
-        { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
-        { url: 'https://snelste.nl', x: 0, y: 800 },
-        { url: 'https://programmablebrowser.com', x: 1000, y: 800 },
-        { url: 'https://www.energiedirect.nl', x: 2000, y: 0 },
-        { url: 'https://essent.nl', x: 3000, y: 0 },
-        { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
-    ];
-
+         const sites = [
+            { url: 'https://tesla.com', x: 0, y: 0 },
+            { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
+            { url: 'https://snelste.nl', x: 0, y: 800 },
+            { url: 'https://programmablebrowser.com', x: 1000, y: 800 },
+            { url: 'https://www.energiedirect.nl', x: 2000, y: 0 },
+            { url: 'https://essent.nl', x: 3000, y: 0 },
+            { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
+        ];
     // --- FUNCTION to apply transformations ---
     const applyTransform = () => {
         canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
@@ -84,6 +83,114 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- EVENT LISTENERS ---
 
+    // Keyboard controls for pan and zoom
+    document.addEventListener('keydown', (event) => {
+        // Check if we're focused on an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return; // Don't interfere with typing
+        }
+
+        const zoomStep = 0.15; // Zoom increment
+        const panStep = 50; // Pan distance in pixels
+        let handled = false;
+
+        switch (event.key) {
+            case '+':
+            case '=':
+                // Zoom in toward center of viewport
+                event.preventDefault();
+                handled = true;
+                smoothZoom(state.zoom * (1 + zoomStep));
+                break;
+            case '-':
+                // Zoom out from center of viewport
+                event.preventDefault();
+                handled = true;
+                smoothZoom(state.zoom * (1 - zoomStep));
+                break;
+            case 'ArrowUp':
+                event.preventDefault();
+                handled = true;
+                smoothPan(0, panStep);
+                break;
+            case 'ArrowDown':
+                event.preventDefault();
+                handled = true;
+                smoothPan(0, -panStep);
+                break;
+            case 'ArrowLeft':
+                event.preventDefault();
+                handled = true;
+                smoothPan(panStep, 0);
+                break;
+            case 'ArrowRight':
+                event.preventDefault();
+                handled = true;
+                smoothPan(-panStep, 0);
+                break;
+        }
+
+        if (handled) {
+            console.log(`Keyboard: ${event.key} - Zoom: ${state.zoom.toFixed(2)}, Pan: ${state.pan.x.toFixed(0)}, ${state.pan.y.toFixed(0)}`);
+        }
+    });
+
+    // Smooth pan function
+    const smoothPan = (deltaX, deltaY) => {
+        const startX = state.pan.x;
+        const startY = state.pan.y;
+        const targetX = startX + deltaX;
+        const targetY = startY + deltaY;
+        
+        animateTransform(startX, startY, state.zoom, targetX, targetY, state.zoom, 200);
+    };
+
+    // Smooth zoom function (zooms toward viewport center)
+    const smoothZoom = (targetZoom) => {
+        // Clamp zoom level
+        targetZoom = Math.max(0.1, Math.min(10, targetZoom));
+        
+        // Get viewport center
+        const viewportCenterX = viewport.clientWidth / 2;
+        const viewportCenterY = viewport.clientHeight / 2;
+        
+        // Calculate the point on the canvas that the center is pointing at
+        const pointX = (viewportCenterX - state.pan.x) / state.zoom;
+        const pointY = (viewportCenterY - state.pan.y) / state.zoom;
+        
+        // Calculate new pan position to keep the center point stationary
+        const targetX = viewportCenterX - pointX * targetZoom;
+        const targetY = viewportCenterY - pointY * targetZoom;
+        
+        animateTransform(state.pan.x, state.pan.y, state.zoom, targetX, targetY, targetZoom, 300);
+    };
+
+    // Smooth animation function
+    const animateTransform = (startX, startY, startZoom, targetX, targetY, targetZoom, duration) => {
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Easing function (ease-out)
+            const eased = 1 - Math.pow(1 - progress, 3);
+            
+            // Interpolate values
+            state.pan.x = startX + (targetX - startX) * eased;
+            state.pan.y = startY + (targetY - startY) * eased;
+            state.zoom = startZoom + (targetZoom - startZoom) * eased;
+            
+            applyTransform();
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        requestAnimationFrame(animate);
+    };
+
     // Mouse Down: Start panning
     viewport.addEventListener('mousedown', (event) => {
         // Only pan with the left mouse button
@@ -131,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTransform();
     });
 
-    // Mouse Wheel: Zoom the canvas (towards the cursor)
+    // Mouse Wheel: Zoom the canvas (towards the cursor) with smooth animation
     viewport.addEventListener('wheel', (event) => {
         event.preventDefault(); // Prevent default page scrolling
 
@@ -147,16 +254,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const pointY = (mouseY - state.pan.y) / state.zoom;
         
         // Calculate new zoom level
-        const newZoom = state.zoom * (1 + direction * zoomIntensity);
-
-        // Clamp the zoom level to avoid zooming too far in or out
-        state.zoom = Math.max(0.1, Math.min(10, newZoom));
+        const targetZoom = Math.max(0.1, Math.min(10, state.zoom * (1 + direction * zoomIntensity)));
         
         // Calculate the new pan position to keep the pointed-at location stationary
-        state.pan.x = mouseX - pointX * state.zoom;
-        state.pan.y = mouseY - pointY * state.zoom;
+        const targetX = mouseX - pointX * targetZoom;
+        const targetY = mouseY - pointY * targetZoom;
 
-        applyTransform();
+        // Smooth animation to new position
+        animateTransform(state.pan.x, state.pan.y, state.zoom, targetX, targetY, targetZoom, 150);
     });
 
 
