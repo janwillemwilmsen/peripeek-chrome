@@ -83,7 +83,19 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             border-radius: 8px;
             overflow: hidden; /* Hides iframe overflow */
-            resize: both; /* Allows users to resize the containers */
+            min-width: 200px; /* Minimum resize width */
+            min-height: 150px; /* Minimum resize height */
+            max-width: 1400px; /* Maximum resize width */
+            max-height: 1000px; /* Maximum resize height */
+        }
+        
+        /* Ensure resize handle is always accessible */
+        .iframe-container:hover {
+            border-color: #555;
+        }
+        
+        .iframe-container:hover .resize-handle {
+            background-color: rgba(100,100,100,0.6);
         }
         
         .iframe-container iframe {

@@ -70,7 +70,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingDiv.style.backgroundColor = 'rgba(244,67,54,0.8)';
             };
 
+            // Create custom resize handle
+            const resizeHandle = document.createElement('div');
+            resizeHandle.style.position = 'absolute';
+            resizeHandle.style.bottom = '0';
+            resizeHandle.style.right = '0';
+            resizeHandle.style.width = '20px';
+            resizeHandle.style.height = '20px';
+            resizeHandle.style.cursor = 'se-resize';
+            resizeHandle.style.backgroundColor = 'rgba(100,100,100,0.3)';
+            resizeHandle.style.borderLeft = '3px solid #666';
+            resizeHandle.style.borderTop = '3px solid #666';
+            resizeHandle.style.zIndex = '1000';
+            resizeHandle.className = 'resize-handle';
+
+            // Add resize functionality
+            let isResizing = false;
+            let startX, startY, startWidth, startHeight;
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = parseInt(window.getComputedStyle(container).width, 10);
+                startHeight = parseInt(window.getComputedStyle(container).height, 10);
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Prevent Panzoom from interfering
+                document.addEventListener('mousemove', handleResize);
+                document.addEventListener('mouseup', stopResize);
+            });
+
+            const handleResize = (e) => {
+                if (!isResizing) return;
+                const newWidth = Math.max(200, Math.min(1400, startWidth + (e.clientX - startX)));
+                const newHeight = Math.max(150, Math.min(1000, startHeight + (e.clientY - startY)));
+                container.style.width = newWidth + 'px';
+                container.style.height = newHeight + 'px';
+            };
+
+            const stopResize = () => {
+                isResizing = false;
+                document.removeEventListener('mousemove', handleResize);
+                document.removeEventListener('mouseup', stopResize);
+            };
+
             container.appendChild(iframe);
+            container.appendChild(resizeHandle);
             canvas.appendChild(container);
         });
     };
@@ -94,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas: true,          // Enable canvas mode
         minZoom: 0.1,          // Minimum zoom level
         maxZoom: 10,           // Maximum zoom level
-        zoomSpeed: 0.065,      // Adjust zoom speed if needed
+        zoomSpeed: 0.65,      // Adjust zoom speed if needed
         panOnlyWhenZoomed: false, // Allow panning at any zoom level
         smoothScroll: true // Enables smoother wheel zooming (if supported)
     });
@@ -104,26 +151,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Attach Panzoom to the viewport for mouse events
     viewport.addEventListener('wheel', panzoom.zoomWithWheel);
+    
+    let isResizing = false;
+    
     viewport.addEventListener('mousedown', (event) => {
         if (event.button === 0) {
-            // Focus the viewport when clicking to enable keyboard controls
-            viewport.focus();
-            // Disable pointer events on iframes during pan
-            document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
-                iframe.style.pointerEvents = 'none';
-            });
-            panzoom.handleDown(event);
+            // Check if the mouse is over a resize handle or iframe container
+            const target = event.target;
+            const container = target.closest('.iframe-container');
+            
+            // If clicking on an iframe container, check if it's near the resize corner
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const isNearResizeCorner = (
+                    event.clientX > rect.right - 20 && 
+                    event.clientY > rect.bottom - 20
+                );
+                
+                // Don't start panning if user is trying to resize
+                if (isNearResizeCorner) {
+                    console.log('Resize handle clicked, skipping pan');
+                    isResizing = true;
+                    return;
+                }
+                
+                // If clicking on iframe content, don't pan
+                if (target.tagName === 'IFRAME' || target.closest('iframe')) {
+                    console.log('Iframe content clicked, skipping pan');
+                    return;
+                }
+            }
+            
+            // Only start panning if clicking on the viewport background
+            if (target === viewport || target === canvas) {
+                isResizing = false;
+                // Focus the viewport when clicking to enable keyboard controls
+                viewport.focus();
+                // Disable pointer events on iframes during pan
+                document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
+                    iframe.style.pointerEvents = 'none';
+                });
+                panzoom.handleDown(event);
+            }
         }
     });
-    viewport.addEventListener('mousemove', panzoom.handleMove);
+    
+    viewport.addEventListener('mousemove', (event) => {
+        if (!isResizing) {
+            panzoom.handleMove(event);
+        }
+    });
+    
     viewport.addEventListener('mouseup', (event) => {
-        panzoom.handleUp(event);
+        if (!isResizing) {
+            panzoom.handleUp(event);
+        }
+        isResizing = false;
         // Re-enable pointer events on iframes
         document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
             iframe.style.pointerEvents = 'auto';
         });
     });
-    viewport.addEventListener('mouseleave', panzoom.handleUp);
+    
+    viewport.addEventListener('mouseleave', (event) => {
+        if (!isResizing) {
+            panzoom.handleUp(event);
+        }
+        isResizing = false;
+        // Re-enable pointer events on iframes
+        document.querySelectorAll('.iframe-container iframe').forEach(iframe => {
+            iframe.style.pointerEvents = 'auto';
+        });
+    });
 
     // Focus the viewport initially so keyboard controls work immediately
     viewport.focus();
@@ -154,11 +253,21 @@ document.addEventListener('DOMContentLoaded', () => {
             case '+':
             case '=':
                 console.log('Executing zoom in...');
-                panzoom.zoomIn();
+                // Zoom toward the center of the viewport
+                const viewportCenterX = viewport.clientWidth / 2;
+                const viewportCenterY = viewport.clientHeight / 2;
+                const currentScale = panzoom.getScale();
+                const newScale = Math.min(currentScale * 1.2, 10); // 20% zoom increase, max 10x
+                panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
                 break;
             case '-':
                 console.log('Executing zoom out...');
-                panzoom.zoomOut();
+                // Zoom toward the center of the viewport
+                const viewportCenterX2 = viewport.clientWidth / 2;
+                const viewportCenterY2 = viewport.clientHeight / 2;
+                const currentScale2 = panzoom.getScale();
+                const newScale2 = Math.max(currentScale2 / 1.2, 0.1); // 20% zoom decrease, min 0.1x
+                panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
                 break;
             case 'ArrowUp':
                 console.log('Executing pan up...');
@@ -218,11 +327,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 case '+':
                 case '=':
                     console.log('Zooming in via message...');
-                    panzoom.zoomIn();
+                    // Zoom toward the center of the viewport
+                    const viewportCenterX = viewport.clientWidth / 2;
+                    const viewportCenterY = viewport.clientHeight / 2;
+                    const currentScale = panzoom.getScale();
+                    const newScale = Math.min(currentScale * 1.2, 10);
+                    panzoom.zoomToPoint(newScale, { clientX: viewportCenterX, clientY: viewportCenterY });
                     break;
                 case '-':
                     console.log('Zooming out via message...');
-                    panzoom.zoomOut();
+                    // Zoom toward the center of the viewport
+                    const viewportCenterX2 = viewport.clientWidth / 2;
+                    const viewportCenterY2 = viewport.clientHeight / 2;
+                    const currentScale2 = panzoom.getScale();
+                    const newScale2 = Math.max(currentScale2 / 1.2, 0.1);
+                    panzoom.zoomToPoint(newScale2, { clientX: viewportCenterX2, clientY: viewportCenterY2 });
                     break;
                 case 'ArrowUp':
                     console.log('Panning up via message...');
