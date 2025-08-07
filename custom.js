@@ -26,7 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const presetButtons = document.querySelectorAll('[data-preset]');
     const applyAllBtn = document.getElementById('apply-all');
     const applyNewBtn = document.getElementById('apply-new');
-    const autoLayoutBtn = document.getElementById('auto-layout');
+    const gridLayoutBtn = document.getElementById('grid-layout');
+    const horizontalLayoutBtn = document.getElementById('horizontal-layout');
+    const verticalLayoutBtn = document.getElementById('vertical-layout');
     const autoLayoutToggle = document.getElementById('auto-layout-toggle');
 
     // --- NATIVE ZOOM & PAN STATE ---
@@ -282,9 +284,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- AUTO-LAYOUT FUNCTION ---
-    const autoLayoutIframes = () => {
-        console.log('🔧 Auto-layouting iframes...');
+    // --- LAYOUT FUNCTIONS ---
+    const gridLayoutIframes = () => {
+        console.log('📦 Applying grid layout...');
         
         const containers = document.querySelectorAll('.iframe-container');
         if (containers.length === 0) return;
@@ -314,10 +316,58 @@ document.addEventListener('DOMContentLoaded', () => {
             maxHeightInRow = Math.max(maxHeightInRow, height);
             itemsInCurrentRow++;
             
-            console.log(`Positioned iframe ${index}: x=${container.style.left}, y=${container.style.top}`);
+            console.log(`Grid positioned iframe ${index}: x=${container.style.left}, y=${container.style.top}`);
         });
         
-        console.log('✅ Auto-layout complete');
+        console.log('✅ Grid layout complete');
+    };
+
+    const horizontalLayoutIframes = () => {
+        console.log('↔️ Applying horizontal layout...');
+        
+        const containers = document.querySelectorAll('.iframe-container');
+        if (containers.length === 0) return;
+        
+        const padding = 50;
+        let currentX = 0;
+        const y = 100; // Fixed Y position for horizontal layout
+        
+        containers.forEach((container, index) => {
+            const width = parseInt(container.style.width) || settings.currentWidth;
+            
+            container.style.left = currentX + 'px';
+            container.style.top = y + 'px';
+            
+            currentX += width + padding;
+            
+            console.log(`Horizontal positioned iframe ${index}: x=${container.style.left}, y=${container.style.top}`);
+        });
+        
+        console.log('✅ Horizontal layout complete');
+    };
+
+    const verticalLayoutIframes = () => {
+        console.log('↕️ Applying vertical layout...');
+        
+        const containers = document.querySelectorAll('.iframe-container');
+        if (containers.length === 0) return;
+        
+        const padding = 50;
+        let currentY = 0;
+        const x = 100; // Fixed X position for vertical layout
+        
+        containers.forEach((container, index) => {
+            const height = parseInt(container.style.height) || settings.currentHeight;
+            
+            container.style.left = x + 'px';
+            container.style.top = currentY + 'px';
+            
+            currentY += height + padding;
+            
+            console.log(`Vertical positioned iframe ${index}: x=${container.style.left}, y=${container.style.top}`);
+        });
+        
+        console.log('✅ Vertical layout complete');
     };
 
     // --- VIEWPORT EVENT HANDLERS ---
@@ -414,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             console.log(`Applied size ${settings.currentWidth}x${settings.currentHeight} to all iframes`);
             if (settings.autoLayoutOnResize) {
-                autoLayoutIframes();
+                gridLayoutIframes();
             }
         }
     });
@@ -440,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         container.style.height = preset.height + 'px';
                     });
                     if (settings.autoLayoutOnResize) {
-                        autoLayoutIframes();
+                        gridLayoutIframes();
                     }
                 }
                 
@@ -464,9 +514,26 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Mode: Apply to new iframes only');
     });
 
-    // Auto-layout button
-    autoLayoutBtn.addEventListener('click', () => {
-        autoLayoutIframes();
+    // Layout buttons
+    gridLayoutBtn.addEventListener('click', () => {
+        gridLayoutIframes();
+        // Update active button
+        [gridLayoutBtn, horizontalLayoutBtn, verticalLayoutBtn].forEach(btn => btn.classList.remove('active'));
+        gridLayoutBtn.classList.add('active');
+    });
+
+    horizontalLayoutBtn.addEventListener('click', () => {
+        horizontalLayoutIframes();
+        // Update active button
+        [gridLayoutBtn, horizontalLayoutBtn, verticalLayoutBtn].forEach(btn => btn.classList.remove('active'));
+        horizontalLayoutBtn.classList.add('active');
+    });
+
+    verticalLayoutBtn.addEventListener('click', () => {
+        verticalLayoutIframes();
+        // Update active button
+        [gridLayoutBtn, horizontalLayoutBtn, verticalLayoutBtn].forEach(btn => btn.classList.remove('active'));
+        verticalLayoutBtn.classList.add('active');
     });
 
     // Auto-layout toggle
@@ -485,8 +552,9 @@ document.addEventListener('DOMContentLoaded', () => {
     transform.y = 150;
     applyTransform();
 
-    // Set initial mode
+    // Set initial modes
     applyAllBtn.classList.add('active');
+    gridLayoutBtn.classList.add('active'); // Default to grid layout
     viewport.style.cursor = 'grab';
 
     console.log('✅ Native JavaScript initialization complete');
