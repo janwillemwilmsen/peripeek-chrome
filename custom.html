@@ -288,8 +288,20 @@
                 </div>
             </div>
 
-            <div style="margin-top:16px;">
-                <label style="font-weight:600; display:block; margin-bottom:6px;">Edit URLs (one per line)</label>
+            <!-- Filter controls -->
+            <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px; flex:1; min-width: 320px;">
+                    <label for="urls-filter-input" class="settings-label" style="min-width:auto; font-weight:600;">Search/filter:</label>
+                    <input id="urls-filter-input" type="text" placeholder="Type to filter URLs..." style="flex:1; padding:6px 8px;" />
+                    <span id="urls-filter-count" style="color:#666; font-size:12px; white-space:nowrap;">Matches: 0</span>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; color:#fff;">
+                    <input id="use-filter-for-preview" type="checkbox" checked /> Preview only filtered URLs
+                </label>
+            </div>
+
+            <div style="margin-top:10px;">
+                <label style="font-weight:600; display:block; margin-bottom:6px;">Edit URLs (one per line) — <span id="urls-count">0</span></label>
                 <textarea id="urls-textarea" rows="10" style="width:100%; padding:8px; font-family: ui-monospace, Menlo, Consolas, monospace;"></textarea>
             </div>
 

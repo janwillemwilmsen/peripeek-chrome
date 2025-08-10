@@ -590,15 +590,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetUrlsBtn = document.getElementById('reset-urls');
     const clearUrlsBtn = document.getElementById('clear-urls');
     const saveUrlsBtn = document.getElementById('save-urls');
+    const urlsCountEl = document.getElementById('urls-count');
+    const filterInput = document.getElementById('urls-filter-input');
+    const filterCountEl = document.getElementById('urls-filter-count');
+    const useFilterForPreview = document.getElementById('use-filter-for-preview');
 
     const sitesToTextarea = () => {
         urlsTextarea.value = sites.map(s => s.url).join('\n');
+        urlsCountEl.textContent = sites.length.toString();
+        updateFilterCount();
+    };
+
+    const getTextareaLines = () => urlsTextarea.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    const applyFilter = (lines) => {
+        const q = filterInput.value.trim().toLowerCase();
+        if (!q) return lines;
+        return lines.filter(l => l.toLowerCase().includes(q));
+    };
+
+    const updateFilterCount = () => {
+        const lines = getTextareaLines();
+        const matches = applyFilter(lines);
+        filterCountEl.textContent = `Matches: ${matches.length}`;
+        urlsCountEl.textContent = lines.length.toString();
     };
 
     const textareaToSites = () => {
-        const lines = urlsTextarea.value.split(/\r?\n/)
-            .map(l => l.trim())
-            .filter(l => l.length > 0);
+        let lines = getTextareaLines();
+        if (useFilterForPreview.checked) {
+            lines = applyFilter(lines);
+        }
         sites = lines.map((url, i) => ({
             url,
             x: (i % 3) * (settings.currentWidth + 50),
@@ -609,6 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
     openModalBtn.addEventListener('click', () => {
         sitesToTextarea();
         modal.showModal();
+        urlsTextarea.focus();
+        urlsTextarea.setSelectionRange(urlsTextarea.value.length, urlsTextarea.value.length);
     });
 
     // Load from .txt file (one URL per line)
@@ -618,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = await file.text();
         const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
         urlsTextarea.value = lines.join('\n');
+        updateFilterCount();
     });
 
     // Fetch sitemap and parse <loc>
@@ -650,6 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (urls.length) {
                 urlsTextarea.value = urls.join('\n');
+                updateFilterCount();
             } else {
                 alert('No <loc> entries found in sitemap');
             }
@@ -666,7 +692,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearUrlsBtn.addEventListener('click', () => {
         urlsTextarea.value = '';
+        updateFilterCount();
     });
+
+    // Live updates of counts while typing and filtering
+    urlsTextarea.addEventListener('input', updateFilterCount);
+    filterInput.addEventListener('input', updateFilterCount);
 
     // Save URLs -> rebuild iframes and persist
     document.getElementById('update-urls-form').addEventListener('submit', (e) => {
