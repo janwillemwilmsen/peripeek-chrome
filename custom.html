@@ -251,6 +251,13 @@
             <button id="vertical-layout" class="preset-button">↕️ Vertical</button>
             <button id="auto-layout-toggle" class="preset-button active">Auto on resize</button>
         </div>
+        
+        <div class="divider"></div>
+        
+        <div class="settings-group">
+            <span class="settings-label">URLs:</span>
+            <button id="open-update-urls" class="preset-button">📝 Update URLs</button>
+        </div>
     </div>
 
     <div id="viewport" tabindex="0">
@@ -258,6 +265,42 @@
             <!-- The iframe containers will be placed here -->
         </div>
     </div>
+
+    <!-- Update URLs Modal -->
+    <dialog id="update-urls-modal">
+        <form method="dialog" id="update-urls-form" style="min-width: 720px; max-width: 90vw;">
+            <h3 style="margin-top:0">Update iframe URLs</h3>
+            <p style="margin: 8px 0 16px; color:#555">Choose one of the methods below to update the list of URLs. You can also edit the list manually before saving.</p>
+
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width: 280px;">
+                    <label style="font-weight:600; display:block; margin-bottom:6px;">Upload text file (.txt)</label>
+                    <input type="file" id="urls-file-input" accept=".txt" />
+                    <small style="display:block; color:#666">One URL per line</small>
+                </div>
+                <div style="flex:1; min-width: 280px;">
+                    <label style="font-weight:600; display:block; margin-bottom:6px;">Fetch from XML sitemap</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="sitemap-url" type="url" placeholder="https://example.com/sitemap.xml" style="flex:1; padding:6px 8px;" />
+                        <button type="button" id="fetch-sitemap" class="preset-button">Fetch</button>
+                    </div>
+                    <small style="display:block; color:#666">We will extract <loc> entries</small>
+                </div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <label style="font-weight:600; display:block; margin-bottom:6px;">Edit URLs (one per line)</label>
+                <textarea id="urls-textarea" rows="10" style="width:100%; padding:8px; font-family: ui-monospace, Menlo, Consolas, monospace;"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button type="button" id="clear-urls" class="preset-button" style="background:#7f8c8d">Clear</button>
+                <button type="button" id="reset-urls" class="preset-button" style="background:#95a5a6">Reset to defaults</button>
+                <button value="cancel" class="preset-button" style="background:#95a5a6">Cancel</button>
+                <button type="submit" value="ok" id="save-urls" class="preset-button">Save</button>
+            </div>
+        </form>
+    </dialog>
 
     <div class="info">
         Controls:<br>

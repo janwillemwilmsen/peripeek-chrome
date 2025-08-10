@@ -43,8 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let isResizing = false;
 
-    // --- IFRAME DEFINITIONS ---
-    const sites = [
+    // --- IFRAME DEFINITIONS (dynamic, persisted) ---
+    const defaultSites = [
         { url: 'https://tesla.com', x: 0, y: 0 },
         { url: 'https://en.wikipedia.org/wiki/Main_Page', x: 1000, y: 0 },
         { url: 'https://snelste.nl', x: 0, y: 800 },
@@ -53,6 +53,31 @@ document.addEventListener('DOMContentLoaded', () => {
         { url: 'https://essent.nl', x: 3000, y: 0 },
         { url: 'https://dividendstocks.cash/dividend-calendar', x: 4000, y: 0 }
     ];
+
+    let sites = [];
+
+    const loadSites = () => {
+        try {
+            const raw = localStorage.getItem('peripeek.sites');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.every(s => typeof s.url === 'string')) {
+                    sites = parsed.map((s, i) => ({
+                        url: s.url,
+                        x: typeof s.x === 'number' ? s.x : (i % 3) * (settings.currentWidth + 50),
+                        y: typeof s.y === 'number' ? s.y : Math.floor(i / 3) * (settings.currentHeight + 50)
+                    }));
+                    return;
+                }
+            }
+        } catch {}
+        sites = [...defaultSites];
+    };
+
+    const saveSites = () => {
+        const slim = sites.map(s => ({ url: s.url, x: s.x, y: s.y }));
+        localStorage.setItem('peripeek.sites', JSON.stringify(slim));
+    };
 
     // --- NATIVE TRANSFORM FUNCTION ---
     const applyTransform = () => {
@@ -100,8 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- IFRAME CREATION WITH NATIVE DRAG & RESIZE ---
+    const clearIframes = () => {
+        while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
+    };
+
     const createIframes = () => {
         console.log('🌐 Creating iframes for sites:', sites);
+        clearIframes();
         
         sites.forEach((site, index) => {
             const container = document.createElement('div');
@@ -259,6 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener('mouseup', (e) => {
                 if (dragState && isDragging) {
                     isDragging = false;
+                    // Persist new position
+                    const left = parseInt(container.style.left);
+                    const top = parseInt(container.style.top);
+                    sites[index].x = left;
+                    sites[index].y = top;
+                    saveSites();
                     dragState = null;
                     
                     dragHandle.style.cursor = 'grab';
@@ -271,6 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (resizeState && isResizing) {
                     isResizing = false;
+                    // Persist new size into settings? We keep per-container size only visually
                     resizeState = null;
                     
                     console.log(`Finished resizing iframe ${index}`);
@@ -543,8 +580,90 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Auto-layout on resize: ${settings.autoLayoutOnResize ? 'enabled' : 'disabled'}`);
     });
 
+    // --- UPDATE URLS MODAL LOGIC ---
+    const modal = document.getElementById('update-urls-modal');
+    const openModalBtn = document.getElementById('open-update-urls');
+    const urlsTextarea = document.getElementById('urls-textarea');
+    const urlsFileInput = document.getElementById('urls-file-input');
+    const sitemapInput = document.getElementById('sitemap-url');
+    const fetchSitemapBtn = document.getElementById('fetch-sitemap');
+    const resetUrlsBtn = document.getElementById('reset-urls');
+    const clearUrlsBtn = document.getElementById('clear-urls');
+    const saveUrlsBtn = document.getElementById('save-urls');
+
+    const sitesToTextarea = () => {
+        urlsTextarea.value = sites.map(s => s.url).join('\n');
+    };
+
+    const textareaToSites = () => {
+        const lines = urlsTextarea.value.split(/\r?\n/)
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
+        sites = lines.map((url, i) => ({
+            url,
+            x: (i % 3) * (settings.currentWidth + 50),
+            y: Math.floor(i / 3) * (settings.currentHeight + 50)
+        }));
+    };
+
+    openModalBtn.addEventListener('click', () => {
+        sitesToTextarea();
+        modal.showModal();
+    });
+
+    // Load from .txt file (one URL per line)
+    urlsFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+        urlsTextarea.value = lines.join('\n');
+    });
+
+    // Fetch sitemap and parse <loc>
+    fetchSitemapBtn.addEventListener('click', async () => {
+        const url = sitemapInput.value.trim();
+        if (!url) return;
+        try {
+            const res = await fetch(url);
+            const xml = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            const locs = Array.from(doc.getElementsByTagName('loc'));
+            const urls = locs.map(n => n.textContent.trim()).filter(Boolean);
+            if (urls.length) {
+                urlsTextarea.value = urls.join('\n');
+            } else {
+                alert('No <loc> entries found in sitemap');
+            }
+        } catch (err) {
+            console.error('Failed to fetch sitemap', err);
+            alert('Failed to fetch sitemap');
+        }
+    });
+
+    resetUrlsBtn.addEventListener('click', () => {
+        sites = [...defaultSites];
+        sitesToTextarea();
+    });
+
+    clearUrlsBtn.addEventListener('click', () => {
+        urlsTextarea.value = '';
+    });
+
+    // Save URLs -> rebuild iframes and persist
+    document.getElementById('update-urls-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        textareaToSites();
+        saveSites();
+        createIframes();
+        gridLayoutIframes();
+        modal.close();
+    });
+
     // --- INITIALIZATION ---
     console.log('🎯 Starting initialization...');
+    loadSites();
     createIframes();
     
     // Set initial transform
