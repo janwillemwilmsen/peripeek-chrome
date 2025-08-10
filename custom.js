@@ -629,8 +629,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const xml = await res.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(xml, 'text/xml');
-            const locs = Array.from(doc.getElementsByTagName('loc'));
-            const urls = locs.map(n => n.textContent.trim()).filter(Boolean);
+
+            // Collect <loc> elements regardless of namespace (e.g., q1:loc, ns:loc, default ns)
+            let locNodes = Array.from(doc.getElementsByTagNameNS('*', 'loc'));
+
+            // Fallback: scan all elements and match by localName
+            if (locNodes.length === 0) {
+                locNodes = Array.from(doc.getElementsByTagName('*')).filter(n => n.localName === 'loc');
+            }
+
+            // Another fallback: sometimes <url><loc> or <sitemap><loc>
+            if (locNodes.length === 0) {
+                const urlNodes = Array.from(doc.getElementsByTagNameNS('*', 'url'));
+                locNodes = urlNodes
+                    .map(n => Array.from(n.getElementsByTagNameNS('*', 'loc'))[0])
+                    .filter(Boolean);
+            }
+
+            const urls = locNodes.map(n => (n.textContent || '').trim()).filter(Boolean);
+
             if (urls.length) {
                 urlsTextarea.value = urls.join('\n');
             } else {
