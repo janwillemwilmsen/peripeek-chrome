@@ -197,13 +197,64 @@ document.addEventListener('DOMContentLoaded', () => {
             dragHandle.style.borderBottom = '1px solid rgba(0,0,0,0.2)';
             dragHandle.style.display = 'flex';
             dragHandle.style.alignItems = 'center';
-            dragHandle.style.justifyContent = 'center';
+            dragHandle.style.justifyContent = 'space-between';
             dragHandle.style.fontSize = '10px';
             dragHandle.style.color = 'rgba(0,0,0,0.6)';
             dragHandle.style.userSelect = 'none';
             dragHandle.style.zIndex = '1001';
-            dragHandle.textContent = '⋮⋮ Drag to move ⋮⋮';
             dragHandle.className = 'drag-handle';
+
+            // Left: clickable URL
+            const link = document.createElement('a');
+            link.href = site.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.title = site.url;
+            link.textContent = site.url;
+            link.style.color = '#2c3e50';
+            link.style.textDecoration = 'none';
+            link.style.padding = '0 8px';
+            link.style.flex = '1';
+            link.style.overflow = 'hidden';
+            link.style.whiteSpace = 'nowrap';
+            link.style.textOverflow = 'ellipsis';
+            // Prevent drag start when clicking the link
+            link.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            link.addEventListener('click', (ev) => ev.stopPropagation());
+
+            // Right: controls (Reload)
+            const controls = document.createElement('div');
+            controls.style.display = 'flex';
+            controls.style.alignItems = 'center';
+            controls.style.gap = '6px';
+            controls.style.padding = '0 6px';
+
+            const reloadBtn = document.createElement('button');
+            reloadBtn.type = 'button';
+            reloadBtn.title = 'Reload iframe';
+            reloadBtn.textContent = '↻';
+            reloadBtn.style.cursor = 'pointer';
+            reloadBtn.style.border = 'none';
+            reloadBtn.style.background = 'transparent';
+            reloadBtn.style.fontSize = '12px';
+            reloadBtn.style.padding = '4px 6px';
+            reloadBtn.style.lineHeight = '1';
+            reloadBtn.style.borderRadius = '4px';
+            reloadBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                // Show loading state
+                loadingDiv.textContent = 'Loading...';
+                loadingDiv.style.opacity = '1';
+                loadingDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                // Safe reload for cross-origin
+                const current = iframe.src;
+                iframe.src = current;
+            });
+
+            controls.appendChild(reloadBtn);
+            dragHandle.appendChild(link);
+            dragHandle.appendChild(controls);
 
             // Adjust iframe for drag handle
             iframe.style.marginTop = '25px';
@@ -699,14 +750,18 @@ document.addEventListener('DOMContentLoaded', () => {
     urlsTextarea.addEventListener('input', updateFilterCount);
     filterInput.addEventListener('input', updateFilterCount);
 
-    // Save URLs -> rebuild iframes and persist
+    // Save URLs -> rebuild iframes and persist (only when Save is clicked)
     document.getElementById('update-urls-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        textareaToSites();
-        saveSites();
-        createIframes();
-        gridLayoutIframes();
-        modal.close();
+        const submitter = e.submitter || document.activeElement;
+        if (submitter && submitter.id === 'save-urls') {
+            e.preventDefault();
+            textareaToSites();
+            saveSites();
+            createIframes();
+            gridLayoutIframes();
+            modal.close('ok');
+        }
+        // If not Save (e.g., Cancel), allow default dialog behavior to close without changes
     });
 
     // --- INITIALIZATION ---
