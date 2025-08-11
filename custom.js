@@ -252,7 +252,124 @@ document.addEventListener('DOMContentLoaded', () => {
                 iframe.src = current;
             });
 
+            // Screenshot button
+            const screenshotBtn = document.createElement('button');
+            screenshotBtn.type = 'button';
+            screenshotBtn.title = 'Screenshot iframe';
+            screenshotBtn.textContent = '📸';
+            screenshotBtn.style.cursor = 'pointer';
+            screenshotBtn.style.border = 'none';
+            screenshotBtn.style.background = 'transparent';
+            screenshotBtn.style.fontSize = '12px';
+            screenshotBtn.style.padding = '4px 6px';
+            screenshotBtn.style.lineHeight = '1';
+            screenshotBtn.style.borderRadius = '4px';
+            screenshotBtn.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            screenshotBtn.addEventListener('click', async (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                try {
+                    // Ask background to capture full page of the iframe URL
+                    const response = await chrome.runtime.sendMessage({ type: 'FULLPAGE_CAPTURE', url: site.url });
+                    if (!response || !response.ok) {
+                        // Fallback to visible crop
+                        const rect = iframe.getBoundingClientRect();
+                        const dpr = window.devicePixelRatio || 1;
+                        chrome.tabs.captureVisibleTab({ format: 'png' }, (dataUrl) => {
+                            if (!dataUrl) { alert('Screenshot failed'); return; }
+                            const img = new Image();
+                            img.onload = () => {
+                                const sx = Math.max(0, Math.round(rect.left * dpr));
+                                const sy = Math.max(0, Math.round(rect.top * dpr));
+                                const sw = Math.max(1, Math.round(rect.width * dpr));
+                                const sh = Math.max(1, Math.round(rect.height * dpr));
+                                const c = document.createElement('canvas');
+                                c.width = sw; c.height = sh;
+                                c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+                                const png = c.toDataURL('image/png');
+                                const a = document.createElement('a');
+                                const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                                a.href = png; a.download = `${host}-${ts}.png`; document.body.appendChild(a); a.click(); a.remove();
+                            };
+                            img.src = dataUrl;
+                        });
+                        return;
+                    }
+                    // If CDP returned tiled images, stitch them vertically
+                    if (response.cdp && Array.isArray(response.images) && response.images.length) {
+                        const dpr = window.devicePixelRatio || 1;
+                        const imgEls = await Promise.all(response.images.map(src => new Promise((res, rej) => {
+                            const im = new Image();
+                            im.onload = () => res(im);
+                            im.onerror = rej;
+                            im.src = src;
+                        })));
+                        const sw = imgEls[0].naturalWidth; // assume same width
+                        const sh = imgEls.reduce((acc, im) => acc + im.naturalHeight, 0);
+                        const canvasShot = document.createElement('canvas');
+                        canvasShot.width = sw;
+                        canvasShot.height = sh;
+                        const ctx = canvasShot.getContext('2d');
+                        let yOff = 0;
+                        imgEls.forEach((im) => {
+                            ctx.drawImage(im, 0, yOff);
+                            yOff += im.naturalHeight;
+                        });
+                        const png = canvasShot.toDataURL('image/png');
+                        const a = document.createElement('a');
+                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.href = png;
+                        a.download = `${host}-fullpage-${ts}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        return;
+                    }
+
+                    // Otherwise stitch fallback images
+                    const { images, vpW, vpH } = response;
+                    if (!Array.isArray(images) || images.length === 0) {
+                        alert('Screenshot failed');
+                        return;
+                    }
+                    const dpr = window.devicePixelRatio || 1;
+                    const imgEls = await Promise.all(images.map(src => new Promise((res, rej) => {
+                        const im = new Image();
+                        im.onload = () => res(im);
+                        im.onerror = rej;
+                        im.src = src;
+                    })));
+                    const sw = Math.round(vpW * dpr);
+                    const sh = imgEls.length * Math.round(vpH * dpr);
+                    const canvasShot = document.createElement('canvas');
+                    canvasShot.width = sw;
+                    canvasShot.height = sh;
+                    const ctx = canvasShot.getContext('2d');
+                    let yOff = 0;
+                    imgEls.forEach((im) => {
+                        const sliceH = Math.round(vpH * dpr);
+                        ctx.drawImage(im, 0, 0, sw, sliceH, 0, yOff, sw, sliceH);
+                        yOff += sliceH;
+                    });
+                    const png = canvasShot.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.href = png;
+                    a.download = `${host}-fullpage-${ts}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } catch (err) {
+                    console.error('Screenshot error', err);
+                    alert('Screenshot failed');
+                }
+            });
+
             controls.appendChild(reloadBtn);
+            controls.appendChild(screenshotBtn);
             dragHandle.appendChild(link);
             dragHandle.appendChild(controls);
 

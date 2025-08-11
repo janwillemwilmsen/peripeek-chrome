@@ -5,11 +5,12 @@
   "description": "A Chrome extension that opens a custom HTML page",
   "permissions": [
     "activeTab",
+    "tabs",
+    "scripting",
+    "debugger",
     "storage",
     "declarativeNetRequest",
-    "cookies",
-    "webRequest",
-    "webRequestBlocking"
+    "cookies"
   ],
   "host_permissions": [
     "<all_urls>"
