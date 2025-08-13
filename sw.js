@@ -132,44 +132,123 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.onUpdated.addListener(listener);
         });
 
-        // Try CDP tiling with explicit clip + captureBeyondViewport to avoid repeats and size caps
+        // Try CDP viewport scrolling + capture (no clip) to avoid site reactions and repeats
         let cdpImages;
         try {
           await dbg.attach(tempTabId);
           await dbg.send(tempTabId, 'Page.enable');
           await dbg.send(tempTabId, 'Emulation.setEmulatedMedia', { media: 'screen' });
           const lm = await dbg.send(tempTabId, 'Page.getLayoutMetrics');
-          const cs = lm && lm.contentSize ? lm.contentSize : { width: 1200, height: 2000 };
-          const contentW = Math.ceil(Math.min(16384, cs.width));
-          const contentH = Math.ceil(Math.min(16384, cs.height));
-          const tileH = 2000; // safe tile height
-          // Keep a sane viewport height to avoid layout jumps
+          const cssVp = lm && lm.cssLayoutViewport ? lm.cssLayoutViewport : { clientWidth: 1200, clientHeight: 800 };
+          const cs = lm && lm.contentSize ? lm.contentSize : { width: cssVp.clientWidth, height: 2000 };
+          const vpW = Math.ceil(cssVp.clientWidth);
+          const vpH = Math.ceil(cssVp.clientHeight);
+          let contentH = Math.ceil(Math.min(32760, cs.height));
+          // Warm: scroll to bottom to trigger lazy load, then back to top, then re-measure
+          await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0, document.documentElement.scrollHeight || document.body.scrollHeight || 0)' });
+          await new Promise(r => setTimeout(r, 600));
+          await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
+          await new Promise(r => setTimeout(r, 600));
+          const lm2 = await dbg.send(tempTabId, 'Page.getLayoutMetrics');
+          const cs2 = lm2 && lm2.contentSize ? lm2.contentSize : null;
+          if (cs2 && cs2.height) {
+            const contentH2 = Math.ceil(Math.min(32760, cs2.height));
+            if (contentH2 > contentH) contentH = contentH2;
+          }
+          const overlapPx = 0; // we will produce non-overlapping slices
+          const step = vpH; // exact steps
+          // Keep current viewport metrics (avoid drastic changes)
           await dbg.send(tempTabId, 'Emulation.setDeviceMetricsOverride', {
-            width: contentW,
-            height: Math.min(tileH, contentH),
+            width: vpW,
+            height: vpH,
             deviceScaleFactor: 1,
             mobile: false,
-            screenWidth: contentW,
-            screenHeight: Math.min(tileH, contentH),
+            screenWidth: vpW,
+            screenHeight: vpH,
             fitWindow: false
           });
+          // Try single full-page capture to avoid seams entirely
+          try {
+            await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
+            await new Promise(r => setTimeout(r, 300));
+            const capFull = await dbg.send(tempTabId, 'Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: true });
+            if (capFull && capFull.data) {
+              try { await dbg.detach(tempTabId); } catch {}
+              try { await chrome.windows.remove(tempWindowId); } catch {}
+              if (originalTabId) { try { await chrome.tabs.update(originalTabId, { active: true }); } catch {} }
+              sendResponse({ ok: true, cdp: true, single: true, image: 'data:image/png;base64,' + capFull.data, url });
+              return;
+            }
+          } catch (e) {
+            // proceed to segmented approach
+          }
+          // Ensure top
           await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise(r => setTimeout(r, 300));
           cdpImages = [];
-          for (let y = 0; y < contentH; y += tileH) {
-            const h = Math.min(tileH, contentH - y);
-            const cap = await dbg.send(tempTabId, 'Page.captureScreenshot', {
-              format: 'png',
-              fromSurface: true,
-              captureBeyondViewport: true,
-              clip: { x: 0, y, width: contentW, height: h, scale: 1 }
+          // Capture top with sticky elements visible once
+          const topCap = await dbg.send(tempTabId, 'Page.captureScreenshot', {
+            format: 'png', fromSurface: true,
+            clip: { x: 0, y: 0, width: vpW, height: Math.max(1, Math.min(vpH, contentH)), scale: 1 }
+          });
+          if (topCap && topCap.data) cdpImages.push('data:image/png;base64,' + topCap.data);
+
+          // Hide sticky/fixed elements to avoid duplication during scrolling
+          await dbg.send(tempTabId, 'Runtime.evaluate', { expression: `(() => { try {
+            const H = [];
+            const nodes = document.body ? document.body.getElementsByTagName('*') : [];
+            for (let i = 0; i < nodes.length; i++) {
+              const el = nodes[i];
+              const cs = getComputedStyle(el);
+              if (cs && (cs.position === 'fixed' || cs.position === 'sticky')) {
+                H.push([el, el.getAttribute('style') || '']);
+                el.style.setProperty('visibility','hidden','important');
+              }
+            }
+            window.__peripeekHidden = H; return H.length;
+          } catch(e) { return -1; } })()` });
+
+          // Build Y positions as exact, non-overlapping slices after the first viewport. Include bottom only if needed
+          const ys = [];
+          const bottomY = Math.max(0, contentH - vpH);
+          if (contentH > vpH) {
+            for (let y = step; y < bottomY; y += step) ys.push(y);
+            if (ys[ys.length - 1] !== bottomY) ys.push(bottomY);
+          }
+          const uniqYs = Array.from(new Set(ys)).sort((a,b)=>a-b);
+
+          for (let idx = 0; idx < uniqYs.length; idx++) {
+            const targetY = uniqYs[idx];
+            await dbg.send(tempTabId, 'Runtime.evaluate', { expression: `window.scrollTo(0, ${targetY})` });
+            await new Promise(r => setTimeout(r, 400));
+            const evalRes = await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'Math.floor(window.scrollY)||0' });
+            const curY = (evalRes && evalRes.result && typeof evalRes.result.value === 'number') ? evalRes.result.value : targetY;
+            const h = Math.max(1, Math.min(vpH, contentH - curY));
+            const cap = await dbg.send(tempTabId, 'Page.captureScreenshot', { 
+              format: 'png', fromSurface: true,
+              clip: { x: 0, y: curY, width: vpW, height: h, scale: 1 }
             });
             if (cap && cap.data) cdpImages.push('data:image/png;base64,' + cap.data);
-            await new Promise(r => setTimeout(r, 100));
           }
+
+          // Restore hidden elements
+          await dbg.send(tempTabId, 'Runtime.evaluate', { expression: `(() => { try {
+            const H = window.__peripeekHidden || [];
+            for (let i = 0; i < H.length; i++) { const el = H[i][0]; const css = H[i][1]; if (el) { if (css) el.setAttribute('style', css); else el.removeAttribute('style'); } }
+            window.__peripeekHidden = null; return H.length;
+          } catch(e) { return -1; } })()` });
+
+          // Detach debugger before closing window
+          try { await dbg.detach(tempTabId); } catch {}
+
+          try { await chrome.windows.remove(tempWindowId); } catch {}
+          if (originalTabId) { try { await chrome.tabs.update(originalTabId, { active: true }); } catch {} }
+          sendResponse({ ok: true, cdp: true, noOverlap: true, images: cdpImages, vpH, overlapPx, url });
+          return;
+
           await dbg.detach(tempTabId);
         } catch (cdpErr) {
-          console.warn('CDP tiling failed:', cdpErr);
+          console.warn('CDP scroll-capture failed:', cdpErr);
           try { await dbg.detach(tempTabId); } catch {}
         }
 
@@ -182,7 +261,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Fallback to image scroll+stitch
         const [{ result: metrics }] = await chrome.scripting.executeScript({
-          target: { tabId: tempTab.id },
+          target: { tabId: tempTabId },
           func: () => ({
             scrollHeight: Math.max(
               document.documentElement ? document.documentElement.scrollHeight : 0,
@@ -201,7 +280,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const images = [];
         for (let i = 0; i < steps; i++) {
           const y = Math.min(i * vpH, totalH - vpH);
-          await chrome.scripting.executeScript({ target: { tabId: tempTab.id }, func: (yy) => window.scrollTo(0, yy), args: [y] });
+          await chrome.scripting.executeScript({ target: { tabId: tempTabId }, func: (yy) => window.scrollTo(0, yy), args: [y] });
           await new Promise(r => setTimeout(r, 200));
           const vis = await chrome.tabs.captureVisibleTab(tempWindowId, { format: 'png' });
           if (!vis) throw new Error('captureVisibleTab returned empty');

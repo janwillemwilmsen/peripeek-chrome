@@ -296,26 +296,136 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         return;
                     }
-                    // If CDP returned tiled images, stitch them vertically
-                    if (response.cdp && Array.isArray(response.images) && response.images.length) {
-                        const dpr = window.devicePixelRatio || 1;
+                    // Single full-page image path
+                    if (response.cdp && response.single && response.image) {
+                        const a = document.createElement('a');
+                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.href = response.image;
+                        a.download = `${host}-fullpage-${ts}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        return;
+                    }
+                    // If background guarantees non-overlapping tiles, do a straight stack
+                    if (response.cdp && response.noOverlap && Array.isArray(response.images) && response.images.length) {
                         const imgEls = await Promise.all(response.images.map(src => new Promise((res, rej) => {
                             const im = new Image();
                             im.onload = () => res(im);
                             im.onerror = rej;
                             im.src = src;
                         })));
-                        const sw = imgEls[0].naturalWidth; // assume same width
-                        const sh = imgEls.reduce((acc, im) => acc + im.naturalHeight, 0);
+                        const sw = imgEls[0].naturalWidth;
+                        let totalH = 0;
+                        imgEls.forEach(im => { totalH += im.naturalHeight; });
                         const canvasShot = document.createElement('canvas');
                         canvasShot.width = sw;
-                        canvasShot.height = sh;
+                        canvasShot.height = Math.max(1, totalH);
                         const ctx = canvasShot.getContext('2d');
                         let yOff = 0;
                         imgEls.forEach((im) => {
-                            ctx.drawImage(im, 0, yOff);
+                            ctx.drawImage(im, 0, 0, im.naturalWidth, im.naturalHeight, 0, yOff, im.naturalWidth, im.naturalHeight);
                             yOff += im.naturalHeight;
                         });
+                        const png = canvasShot.toDataURL('image/png');
+                        const a = document.createElement('a');
+                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.href = png;
+                        a.download = `${host}-fullpage-${ts}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        return;
+                    }
+                    // If CDP returned tiled images, stitch them using seam matching to avoid duplicates
+                    if (response.cdp && Array.isArray(response.images) && response.images.length) {
+                        const imgEls = await Promise.all(response.images.map(src => new Promise((res, rej) => {
+                            const im = new Image();
+                            im.onload = () => res(im);
+                            im.onerror = rej;
+                            im.src = src;
+                        })));
+                        const sw = imgEls[0].naturalWidth;
+                        const maxOverlap = Math.max(80, Math.round((response.vpH || imgEls[0].naturalHeight) * 0.33));
+
+                        // Precompute best overlaps between consecutive tiles using grayscale + gradient matching
+                        const overlaps = [];
+                        const offPrev = document.createElement('canvas');
+                        const offCurr = document.createElement('canvas');
+                        offPrev.width = offCurr.width = sw;
+                        offPrev.height = offCurr.height = maxOverlap;
+                        const pctx = offPrev.getContext('2d');
+                        const cctx = offCurr.getContext('2d');
+
+                        function diffScore(prevImg, currImg, overlap) {
+                            pctx.clearRect(0,0,sw,maxOverlap);
+                            cctx.clearRect(0,0,sw,maxOverlap);
+                            pctx.drawImage(prevImg, 0, prevImg.naturalHeight - overlap, sw, overlap, 0, 0, sw, overlap);
+                            cctx.drawImage(currImg, 0, 0, sw, overlap, 0, 0, sw, overlap);
+                            const a = pctx.getImageData(0, 0, sw, overlap).data;
+                            const b = cctx.getImageData(0, 0, sw, overlap).data;
+                            let sum = 0;
+                            const stepX = 4;
+                            for (let y = 1; y < overlap; y += 1) {
+                                for (let x = 0; x < sw - stepX; x += stepX) {
+                                    const i = (y * sw + x) * 4;
+                                    const j = ((y-1) * sw + x) * 4;
+                                    // grayscale
+                                    const ga = 0.299*a[i] + 0.587*a[i+1] + 0.114*a[i+2];
+                                    const gb = 0.299*b[i] + 0.587*b[i+1] + 0.114*b[i+2];
+                                    // simple vertical gradient magnitude
+                                    const gpa = Math.abs( (0.299*a[j] + 0.587*a[j+1] + 0.114*a[j+2]) - ga );
+                                    const gpb = Math.abs( (0.299*b[j] + 0.587*b[j+1] + 0.114*b[j+2]) - gb );
+                                    sum += Math.abs(ga - gb) + Math.abs(gpa - gpb);
+                                }
+                            }
+                            return sum;
+                        }
+
+                        for (let i = 1; i < imgEls.length; i++) {
+                            const prev = imgEls[i-1];
+                            const curr = imgEls[i];
+                            let best = Math.min(maxOverlap, prev.naturalHeight, curr.naturalHeight) - 1;
+                            let bestScore = Infinity;
+                            const minOverlap = Math.min(120, best);
+                            // coarse search
+                            for (let ov = minOverlap; ov <= best; ov += 12) {
+                                const s = diffScore(prev, curr, ov);
+                                if (s < bestScore) { bestScore = s; best = ov; }
+                            }
+                            // refine around best
+                            const start = Math.max(minOverlap, best - 12);
+                            const end = Math.min(best + 12, Math.min(maxOverlap, prev.naturalHeight, curr.naturalHeight) - 1);
+                            for (let ov = start; ov <= end; ov += 2) {
+                                const s = diffScore(prev, curr, ov);
+                                if (s < bestScore) { bestScore = s; best = ov; }
+                            }
+                            overlaps.push(best);
+                        }
+
+                        // Compute final height
+                        let totalH = imgEls[0].naturalHeight;
+                        for (let i = 1; i < imgEls.length; i++) {
+                            totalH += imgEls[i].naturalHeight - overlaps[i-1];
+                        }
+                        const canvasShot = document.createElement('canvas');
+                        canvasShot.width = sw;
+                        canvasShot.height = Math.max(1, totalH);
+                        const ctx = canvasShot.getContext('2d');
+
+                        // Draw first
+                        let yOff = 0;
+                        ctx.drawImage(imgEls[0], 0, 0);
+                        yOff += imgEls[0].naturalHeight - (overlaps[0] || 0);
+                        for (let i = 1; i < imgEls.length; i++) {
+                            const ov = overlaps[i-1] || 0;
+                            const im = imgEls[i];
+                            ctx.drawImage(im, 0, ov, sw, im.naturalHeight - ov, 0, yOff, sw, im.naturalHeight - ov);
+                            yOff += im.naturalHeight - ov;
+                        }
+
                         const png = canvasShot.toDataURL('image/png');
                         const a = document.createElement('a');
                         const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
