@@ -1022,23 +1022,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFilterCount();
     });
 
-    // Wire up data-folder buttons
+    // Wire up data-folder controls (single save button)
     const fileNameInput = document.getElementById('file-name-input');
-    const saveListBtn = document.getElementById('save-list-btn');
-    const saveXmlBtn = document.getElementById('save-xml-btn');
-
-    saveListBtn?.addEventListener('click', async () => {
+    const saveDataBtn = document.getElementById('save-data-btn');
+ 
+    saveDataBtn?.addEventListener('click', async () => {
         const name = (fileNameInput?.value || '').trim();
         if (!name) { alert('Please enter a file name'); return; }
-        await saveTextAsFile(name, urlsTextarea.value || '');
-        await refreshSavedFilesList();
-    });
-
-    saveXmlBtn?.addEventListener('click', async () => {
-        const name = (fileNameInput?.value || '').trim();
-        if (!name) { alert('Please enter a file name'); return; }
-        if (!lastFetchedSitemapXml) { alert('No sitemap XML fetched yet'); return; }
-        await saveXmlAsFile(name, lastFetchedSitemapXml);
+        const text = (urlsTextarea.value || '').trim();
+        if (text.length > 0) {
+            await saveTextAsFile(name, text);
+        } else if (lastFetchedSitemapXml && lastFetchedSitemapXml.trim().length > 0) {
+            await saveXmlAsFile(name, lastFetchedSitemapXml);
+        } else {
+            alert('Nothing to save: please enter URLs or fetch a sitemap first');
+            return;
+        }
         await refreshSavedFilesList();
     });
 
