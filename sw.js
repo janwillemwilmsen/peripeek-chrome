@@ -110,6 +110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const originalTabId = sender && sender.tab && sender.tab.id;
         const url = message.url;
+        const wantMobile = !!message.mobile;
         // Open temp focused window for CDP control
         const tempWindow = await chrome.windows.create({ url, focused: true, state: 'maximized' });
         const tempWindowId = tempWindow.id;
@@ -141,8 +142,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const lm = await dbg.send(tempTabId, 'Page.getLayoutMetrics');
           const cssVp = lm && lm.cssLayoutViewport ? lm.cssLayoutViewport : { clientWidth: 1200, clientHeight: 800 };
           const cs = lm && lm.contentSize ? lm.contentSize : { width: cssVp.clientWidth, height: 2000 };
-          const vpW = Math.ceil(cssVp.clientWidth);
-          const vpH = Math.ceil(cssVp.clientHeight);
+          let vpW = Math.ceil(cssVp.clientWidth);
+          let vpH = Math.ceil(cssVp.clientHeight);
           let contentH = Math.ceil(Math.min(32760, cs.height));
           // Warm: scroll to bottom to trigger lazy load, then back to top, then re-measure
           await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0, document.documentElement.scrollHeight || document.body.scrollHeight || 0)' });
@@ -158,15 +159,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const overlapPx = 0; // we will produce non-overlapping slices
           const step = vpH; // exact steps
           // Keep current viewport metrics (avoid drastic changes)
-          await dbg.send(tempTabId, 'Emulation.setDeviceMetricsOverride', {
-            width: vpW,
-            height: vpH,
-            deviceScaleFactor: 1,
-            mobile: false,
-            screenWidth: vpW,
-            screenHeight: vpH,
-            fitWindow: false
-          });
+          if (wantMobile) {
+            // Emulate a common mobile viewport (e.g. iPhone X-ish)
+            vpW = 375; vpH = 812;
+            await dbg.send(tempTabId, 'Emulation.setDeviceMetricsOverride', {
+              width: vpW,
+              height: vpH,
+              deviceScaleFactor: 2,
+              mobile: true,
+              screenWidth: vpW,
+              screenHeight: vpH,
+              fitWindow: false
+            });
+            await dbg.send(tempTabId, 'Emulation.setUserAgentOverride', {
+              userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Mobile/15E148 Safari/604.1',
+              platform: 'iPhone'
+            });
+          } else {
+            await dbg.send(tempTabId, 'Emulation.setDeviceMetricsOverride', {
+              width: vpW,
+              height: vpH,
+              deviceScaleFactor: 1,
+              mobile: false,
+              screenWidth: vpW,
+              screenHeight: vpH,
+              fitWindow: false
+            });
+          }
           // Try single full-page capture to avoid seams entirely
           try {
             await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
