@@ -288,6 +288,23 @@
                 </div>
             </div>
 
+            <!-- Data folder: save and manage files -->
+            <div style="margin-top:16px; display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+                <div style="flex:1; min-width: 320px;">
+                    <label style="font-weight:600; display:block; margin-bottom:6px;">Data folder</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="file-name-input" type="text" placeholder="Enter name (e.g. my-urls)" style="flex:1; padding:6px 8px;" />
+                        <button type="button" id="save-list-btn" class="preset-button">Save current list</button>
+                        <button type="button" id="save-xml-btn" class="preset-button" style="background:#8e44ad">Save last sitemap XML</button>
+                    </div>
+                    <small style="display:block; color:#666">Saved in extension storage</small>
+                </div>
+                <div style="flex:1; min-width: 320px;">
+                    <label style="font-weight:600; display:block; margin-bottom:6px;">Saved files</label>
+                    <div id="saved-files-list" style="max-height:180px; overflow:auto; border:1px solid #ddd; background:#fff; color:#333; border-radius:6px; padding:6px;"></div>
+                </div>
+            </div>
+
             <!-- Filter controls -->
             <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:8px; flex:1; min-width: 320px;">

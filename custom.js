@@ -941,23 +941,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     };
 
-    openModalBtn.addEventListener('click', () => {
-        sitesToTextarea();
-        modal.showModal();
-        urlsTextarea.focus();
-        urlsTextarea.setSelectionRange(urlsTextarea.value.length, urlsTextarea.value.length);
-    });
-
-    // Load from .txt file (one URL per line)
-    urlsFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        const text = await file.text();
-        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-        urlsTextarea.value = lines.join('\n');
-        updateFilterCount();
-    });
-
     // Fetch sitemap and parse <loc>
     fetchSitemapBtn.addEventListener('click', async () => {
         const url = sitemapInput.value.trim();
@@ -965,6 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(url);
             const xml = await res.text();
+            lastFetchedSitemapXml = xml; // remember last fetched XML
             const parser = new DOMParser();
             const doc = parser.parseFromString(xml, 'text/xml');
 
@@ -998,6 +982,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Load from .txt file (one URL per line)
+    urlsFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+        urlsTextarea.value = lines.join('\n');
+        updateFilterCount();
+    });
+
+    // Wire up data-folder buttons
+    const fileNameInput = document.getElementById('file-name-input');
+    const saveListBtn = document.getElementById('save-list-btn');
+    const saveXmlBtn = document.getElementById('save-xml-btn');
+
+    saveListBtn?.addEventListener('click', async () => {
+        const name = (fileNameInput?.value || '').trim();
+        if (!name) { alert('Please enter a file name'); return; }
+        await saveTextAsFile(name, urlsTextarea.value || '');
+        await refreshSavedFilesList();
+    });
+
+    saveXmlBtn?.addEventListener('click', async () => {
+        const name = (fileNameInput?.value || '').trim();
+        if (!name) { alert('Please enter a file name'); return; }
+        if (!lastFetchedSitemapXml) { alert('No sitemap XML fetched yet'); return; }
+        await saveXmlAsFile(name, lastFetchedSitemapXml);
+        await refreshSavedFilesList();
+    });
+
+    openModalBtn.addEventListener('click', async () => {
+        sitesToTextarea();
+        await refreshSavedFilesList();
+        modal.showModal();
+        urlsTextarea.focus();
+        urlsTextarea.setSelectionRange(urlsTextarea.value.length, urlsTextarea.value.length);
+    });
+
     resetUrlsBtn.addEventListener('click', () => {
         sites = [...defaultSites];
         sitesToTextarea();
@@ -1026,6 +1048,160 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // If not Save (e.g., Cancel), allow default dialog behavior to close without changes
     });
+
+    // --- STORAGE BACKED DATA FOLDER HELPERS ---
+	const DATA_INDEX_KEY = 'peripeek.data.index';
+	const DATA_FILE_PREFIX = 'peripeek.data.file:';
+	let lastFetchedSitemapXml = '';
+
+	async function readStorage(keys) {
+		return await chrome.storage.local.get(keys);
+	}
+
+	async function writeStorage(obj) {
+		return await chrome.storage.local.set(obj);
+	}
+
+	async function removeStorage(keys) {
+		return await chrome.storage.local.remove(keys);
+	}
+
+	async function listDataFiles() {
+		const res = await readStorage([DATA_INDEX_KEY]);
+		const idx = Array.isArray(res[DATA_INDEX_KEY]) ? res[DATA_INDEX_KEY] : [];
+		return idx;
+	}
+
+	async function saveDataIndex(names) {
+		await writeStorage({ [DATA_INDEX_KEY]: names });
+	}
+
+	async function saveTextAsFile(name, text) {
+		const safe = name.trim().replace(/[^a-z0-9-_]/gi, '-').replace(/-+/g, '-');
+		if (!safe) throw new Error('Invalid name');
+		const key = DATA_FILE_PREFIX + safe;
+		const now = new Date().toISOString();
+		await writeStorage({ [key]: { type: 'text', name: safe, createdAt: now, updatedAt: now, payload: text } });
+		const list = await listDataFiles();
+		if (!list.includes(safe)) {
+			list.push(safe);
+			await saveDataIndex(list);
+		}
+		return safe;
+	}
+
+	async function saveXmlAsFile(name, xml) {
+		const safe = name.trim().replace(/[^a-z0-9-_]/gi, '-').replace(/-+/g, '-');
+		if (!safe) throw new Error('Invalid name');
+		const key = DATA_FILE_PREFIX + safe;
+		const now = new Date().toISOString();
+		await writeStorage({ [key]: { type: 'xml', name: safe, createdAt: now, updatedAt: now, payload: xml } });
+		const list = await listDataFiles();
+		if (!list.includes(safe)) {
+			list.push(safe);
+			await saveDataIndex(list);
+		}
+		return safe;
+	}
+
+	async function loadDataFile(name) {
+		const key = DATA_FILE_PREFIX + name;
+		const res = await readStorage([key]);
+		return res[key] || null;
+	}
+
+	async function deleteDataFile(name) {
+		const key = DATA_FILE_PREFIX + name;
+		await removeStorage([key]);
+		const list = await listDataFiles();
+		const next = list.filter(n => n !== name);
+		await saveDataIndex(next);
+	}
+
+	function renderSavedFilesList(items) {
+		const listEl = document.getElementById('saved-files-list');
+		if (!listEl) return;
+		listEl.innerHTML = '';
+		if (!items || !items.length) {
+			listEl.textContent = 'No files saved yet';
+			return;
+		}
+		items.forEach(async (name) => {
+			const file = await loadDataFile(name);
+			if (!file) return;
+			const row = document.createElement('div');
+			row.style.display = 'flex';
+			row.style.alignItems = 'center';
+			row.style.gap = '8px';
+			row.style.borderBottom = '1px solid #eee';
+			row.style.padding = '6px 0';
+			const meta = document.createElement('div');
+			meta.style.flex = '1';
+			meta.innerHTML = `<strong>${file.name}</strong> <span style="color:#888; font-size:12px;">(${file.type})</span>`;
+			const loadBtn = document.createElement('button');
+			loadBtn.type = 'button';
+			loadBtn.className = 'preset-button';
+			loadBtn.textContent = 'Load';
+			loadBtn.addEventListener('click', async (ev) => {
+				ev.preventDefault(); ev.stopPropagation();
+				if (file.type === 'xml') {
+					// Extract <loc> entries and put into textarea
+					try {
+						const parser = new DOMParser();
+						const doc = parser.parseFromString(file.payload, 'text/xml');
+						let locNodes = Array.from(doc.getElementsByTagNameNS('*', 'loc'));
+						if (locNodes.length === 0) locNodes = Array.from(doc.getElementsByTagName('*')).filter(n => n.localName === 'loc');
+						if (locNodes.length === 0) {
+							const urlNodes = Array.from(doc.getElementsByTagNameNS('*', 'url'));
+							locNodes = urlNodes.map(n => Array.from(n.getElementsByTagNameNS('*', 'loc'))[0]).filter(Boolean);
+						}
+						const urls = locNodes.map(n => (n.textContent || '').trim()).filter(Boolean);
+						urlsTextarea.value = urls.join('\n');
+						updateFilterCount();
+					} catch {}
+				} else if (file.type === 'text') {
+					urlsTextarea.value = (file.payload || '').trim();
+					updateFilterCount();
+				}
+			});
+			const exportBtn = document.createElement('button');
+			exportBtn.type = 'button';
+			exportBtn.className = 'preset-button';
+			exportBtn.style.background = '#16a085';
+			exportBtn.textContent = 'Export';
+			exportBtn.addEventListener('click', (ev) => {
+				ev.preventDefault(); ev.stopPropagation();
+				const blob = new Blob([file.payload || ''], { type: file.type === 'xml' ? 'application/xml' : 'text/plain' });
+				const a = document.createElement('a');
+				const ts = new Date().toISOString().replace(/[:.]/g, '-');
+				a.href = URL.createObjectURL(blob);
+				a.download = `${file.name}-${ts}.${file.type === 'xml' ? 'xml' : 'txt'}`;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(a.href);
+			});
+			const delBtn = document.createElement('button');
+			delBtn.type = 'button';
+			delBtn.className = 'preset-button';
+			delBtn.style.background = '#c0392b';
+			delBtn.textContent = 'Delete';
+			delBtn.addEventListener('click', async (ev) => {
+				ev.preventDefault(); ev.stopPropagation();
+				await deleteDataFile(file.name);
+				renderSavedFilesList(await listDataFiles());
+			});
+			row.appendChild(meta);
+			row.appendChild(loadBtn);
+			row.appendChild(exportBtn);
+			row.appendChild(delBtn);
+			listEl.appendChild(row);
+		});
+	}
+
+	async function refreshSavedFilesList() {
+		renderSavedFilesList(await listDataFiles());
+	}
 
     // --- INITIALIZATION ---
     console.log('🎯 Starting initialization...');
