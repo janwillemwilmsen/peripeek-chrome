@@ -769,6 +769,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
+        // Ignore when typing in editable fields or when modal is open
+        const target = e.target;
+        const tag = target && target.tagName ? target.tagName.toLowerCase() : '';
+        const isEditable = (
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select' ||
+            (target && target.isContentEditable)
+        );
+        if (isEditable) return;
+        if (typeof modal !== 'undefined' && modal && modal.open) return;
+
         switch(e.key) {
             case '+':
             case '=':
