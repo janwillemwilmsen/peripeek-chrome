@@ -159,30 +159,35 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingDiv.style.borderRadius = '3px';
             loadingDiv.style.fontSize = '12px';
             loadingDiv.style.zIndex = '10';
-            loadingDiv.textContent = 'Loading...';
+            loadingDiv.textContent = 'Queued...';
             container.appendChild(loadingDiv);
 
             // Create iframe
             const iframe = document.createElement('iframe');
-            iframe.src = site.url;
+            iframe.src = 'about:blank';
+            iframe.dataset.src = site.url;
             iframe.style.width = '100%';
             iframe.style.height = '100%';
             iframe.style.border = 'none';
             iframe.style.backgroundColor = '#ffffff';
 
             iframe.onload = () => {
-                loadingDiv.textContent = '✓ Loaded';
-                loadingDiv.style.backgroundColor = 'rgba(76,175,80,0.8)';
-                setTimeout(() => {
-                    loadingDiv.style.opacity = '0';
-                    loadingDiv.style.transition = 'opacity 0.5s';
-                    setTimeout(() => loadingDiv.remove(), 500);
-                }, 2000);
+                if (iframe.src !== 'about:blank') {
+                    loadingDiv.textContent = '✓ Loaded';
+                    loadingDiv.style.backgroundColor = 'rgba(76,175,80,0.8)';
+                    setTimeout(() => {
+                        loadingDiv.style.opacity = '0';
+                        loadingDiv.style.transition = 'opacity 0.5s';
+                        setTimeout(() => loadingDiv.remove(), 500);
+                    }, 2000);
+                }
             };
 
             iframe.onerror = () => {
-                loadingDiv.textContent = '✗ Failed';
-                loadingDiv.style.backgroundColor = 'rgba(244,67,54,0.8)';
+                if (iframe.src !== 'about:blank') {
+                    loadingDiv.textContent = '✗ Failed';
+                    loadingDiv.style.backgroundColor = 'rgba(244,67,54,0.8)';
+                }
             };
 
             // Create drag handle
@@ -599,6 +604,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Sequentially load iframes one-by-one to reduce initial network contention
+    const loadIframesSequentially = async () => {
+        const containers = Array.from(document.querySelectorAll('.iframe-container'));
+        for (const container of containers) {
+            const iframe = container.querySelector('iframe');
+            const loadingDiv = container.querySelector('div');
+            if (!iframe) continue;
+            const target = iframe.dataset.src;
+            if (!target) continue;
+            if (loadingDiv) {
+                loadingDiv.textContent = 'Loading...';
+                loadingDiv.style.opacity = '1';
+                loadingDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            }
+            iframe.src = target;
+            await new Promise((resolve) => {
+                let settled = false;
+                const done = () => { if (!settled) { settled = true; resolve(); } };
+                const onLoad = () => { iframe.removeEventListener('load', onLoad); iframe.removeEventListener('error', onError); done(); };
+                const onError = () => { iframe.removeEventListener('load', onLoad); iframe.removeEventListener('error', onError); done(); };
+                iframe.addEventListener('load', onLoad, { once: true });
+                iframe.addEventListener('error', onError, { once: true });
+                // Hard timeout to avoid stalls
+                setTimeout(done, 8000);
+            });
+            // brief breather between loads
+            await new Promise(r => setTimeout(r, 150));
+        }
+    };
+
     // --- LAYOUT FUNCTIONS ---
     const gridLayoutIframes = () => {
         console.log('📦 Applying grid layout...');
@@ -985,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             textareaToSites();
             saveSites();
             createIframes();
+            loadIframesSequentially(); // Sequential load after saving
             gridLayoutIframes();
             modal.close('ok');
         }
@@ -995,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Starting initialization...');
     loadSites();
     createIframes();
+    loadIframesSequentially();
     
     // Set initial transform
     transform.x = 200;
