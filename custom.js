@@ -24,8 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const heightInput = document.getElementById('iframe-height');
     const applySizeBtn = document.getElementById('apply-size');
     const presetButtons = document.querySelectorAll('[data-preset]');
-    const applyAllBtn = document.getElementById('apply-all');
-    const applyNewBtn = document.getElementById('apply-new');
+    const captureAllBtn = document.getElementById('capture-all');
     const gridLayoutBtn = document.getElementById('grid-layout');
     const horizontalLayoutBtn = document.getElementById('horizontal-layout');
     const verticalLayoutBtn = document.getElementById('vertical-layout');
@@ -865,19 +864,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Apply mode buttons
-    applyAllBtn.addEventListener('click', () => {
-        settings.applyToExisting = true;
-        applyAllBtn.classList.add('active');
-        applyNewBtn.classList.remove('active');
-        console.log('Mode: Apply to all iframes');
-    });
-
-    applyNewBtn.addEventListener('click', () => {
-        settings.applyToExisting = false;
-        applyNewBtn.classList.add('active');
-        applyAllBtn.classList.remove('active');
-        console.log('Mode: Apply to new iframes only');
+    // Capture all button
+    captureAllBtn.addEventListener('click', async () => {
+        const containers = Array.from(document.querySelectorAll('.iframe-container'));
+        for (const container of containers) {
+            const btn = container.querySelector('button[title="Screenshot iframe"]');
+            if (btn) {
+                btn.click();
+                await new Promise(r => setTimeout(r, 600));
+            }
+        }
     });
 
     // Layout buttons
@@ -1258,7 +1254,6 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTransform();
 
     // Set initial modes
-    applyAllBtn.classList.add('active');
     gridLayoutBtn.classList.add('active'); // Default to grid layout
     viewport.style.cursor = 'grab';
 
