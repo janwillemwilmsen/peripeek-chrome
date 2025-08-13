@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const applySizeBtn = document.getElementById('apply-size');
     const presetButtons = document.querySelectorAll('[data-preset]');
     const captureAllBtn = document.getElementById('capture-all');
+    const captureAllMobileBtn = document.getElementById('capture-all-mobile');
     const gridLayoutBtn = document.getElementById('grid-layout');
     const horizontalLayoutBtn = document.getElementById('horizontal-layout');
     const verticalLayoutBtn = document.getElementById('vertical-layout');
@@ -996,6 +997,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn) {
                 btn.click();
                 await new Promise(r => setTimeout(r, 600));
+            }
+        }
+    });
+
+    // Capture all mobile button
+    captureAllMobileBtn.addEventListener('click', async () => {
+        const containers = Array.from(document.querySelectorAll('.iframe-container'));
+        for (const container of containers) {
+            const btn = container.querySelector('button[title="Screenshot mobile"]');
+            if (btn) {
+                btn.click();
+                await new Promise(r => setTimeout(r, 700));
             }
         }
     });
