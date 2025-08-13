@@ -56,6 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sites = [];
 
+    // Live filter view state for textarea
+    let masterTextareaContent = '';
+    let isFilterViewActive = false;
+
     const loadSites = () => {
         try {
             const raw = localStorage.getItem('peripeek.sites');
@@ -923,11 +927,37 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateFilterCount = () => {
-        const lines = getTextareaLines();
-        const matches = applyFilter(lines);
+        const q = filterInput.value.trim().toLowerCase();
+        // If filter is empty, restore original content and update counts
+        if (q === '') {
+            if (isFilterViewActive) {
+                urlsTextarea.value = masterTextareaContent;
+                isFilterViewActive = false;
+            }
+            const baseLines = urlsTextarea.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            filterCountEl.textContent = `Matches: ${baseLines.length}`;
+            urlsCountEl.textContent = baseLines.length.toString();
+            return;
+        }
+        // Enter filter view if not already, snapshot master content once
+        if (!isFilterViewActive) {
+            masterTextareaContent = urlsTextarea.value;
+            isFilterViewActive = true;
+        }
+        const baseLines = masterTextareaContent.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const matches = baseLines.filter(l => l.toLowerCase().includes(q));
         filterCountEl.textContent = `Matches: ${matches.length}`;
-        urlsCountEl.textContent = lines.length.toString();
+        urlsCountEl.textContent = baseLines.length.toString();
+        urlsTextarea.value = matches.join('\n');
     };
+    
+    // Restore original textarea when filter is cleared
+    filterInput.addEventListener('input', () => {
+        if (filterInput.value.trim() === '' && isFilterViewActive) {
+            urlsTextarea.value = masterTextareaContent;
+            isFilterViewActive = false;
+        }
+    });
 
     const textareaToSites = () => {
         let lines = getTextareaLines();
@@ -1014,7 +1044,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     openModalBtn.addEventListener('click', async () => {
         sitesToTextarea();
-        await refreshSavedFilesList();
+        masterTextareaContent = urlsTextarea.value; // snapshot original
+        isFilterViewActive = false;
+        await refreshSavedFilesList?.();
         modal.showModal();
         urlsTextarea.focus();
         urlsTextarea.setSelectionRange(urlsTextarea.value.length, urlsTextarea.value.length);
