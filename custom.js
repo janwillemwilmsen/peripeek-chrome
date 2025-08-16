@@ -92,20 +92,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- NATIVE ZOOM FUNCTIONS ---
     const zoomIn = () => {
-        transform.scale = Math.min(transform.scale * 1.2, 5);
-        applyTransform();
+        const rect = viewport.getBoundingClientRect();
+        const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        zoomToPoint(-1, center); // negative delta to zoom in with wheel semantics below
     };
 
     const zoomOut = () => {
-        transform.scale = Math.max(transform.scale / 1.2, 0.1);
-        applyTransform();
+        const rect = viewport.getBoundingClientRect();
+        const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        zoomToPoint(1, center); // positive delta to zoom out
     };
 
     const zoomToPoint = (delta, point) => {
         const oldScale = transform.scale;
-        const newScale = delta > 0 ? 
-            Math.min(oldScale * 1.1, 5) : 
-            Math.max(oldScale / 1.1, 0.1);
+        // slower zoom factor
+        const step = 1.04;
+        const newScale = delta > 0 ?
+            Math.max(oldScale / step, 0.1) :
+            Math.min(oldScale * step, 5);
         
         if (newScale !== oldScale) {
             const rect = viewport.getBoundingClientRect();
@@ -1393,6 +1397,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set initial modes
     gridLayoutBtn.classList.add('active'); // Default to grid layout
     viewport.style.cursor = 'grab';
+
+    // Wire info button
+	const openInfoBtn = document.getElementById('open-info');
+	const infoModal = document.getElementById('info-modal');
+	openInfoBtn?.addEventListener('click', () => {
+		infoModal?.showModal();
+	});
 
     console.log('✅ Native JavaScript initialization complete');
 }); 

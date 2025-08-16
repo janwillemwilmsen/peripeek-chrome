@@ -257,6 +257,12 @@
             <span class="settings-label">URLs:</span>
             <button id="open-update-urls" class="preset-button">📝 Update URLs</button>
         </div>
+        
+        <div class="divider"></div>
+        
+        <div class="settings-group">
+            <button id="open-info" class="preset-button">ℹ️ Info</button>
+        </div>
     </div>
 
     <div id="viewport" tabindex="0">
@@ -329,17 +335,27 @@
         </form>
     </dialog>
 
-    <div class="info">
-        Controls:<br>
-        - Click on background first to focus for keyboard controls<br>
-        - Drag background to pan the canvas<br>
-        - Drag iframe containers to move them around<br>
-        - Use mouse wheel to zoom in/out<br>
-        - Use + / - keys to zoom in/out<br>
-        - Use arrow keys to pan around<br>
-        - Iframes are resizable using the bottom-right corner<br>
-        Note: Some websites may not load due to security restrictions, even with modifications.
-    </div>
+    <!-- Info Modal -->
+    <dialog id="info-modal">
+        <form method="dialog" style="min-width: 520px; max-width: 90vw;">
+            <h3 style="margin-top:0">Controls & Tips</h3>
+            <div style="color:#333; background:#fff; padding:12px; border-radius:8px;">
+                <ul style="margin:0; padding-left:18px; line-height:1.6;">
+                    <li>Click on background first to focus for keyboard controls</li>
+                    <li>Drag background to pan the canvas</li>
+                    <li>Drag iframe containers to move them around</li>
+                    <li>Use mouse wheel to zoom in/out</li>
+                    <li>Use + / - keys to zoom in/out</li>
+                    <li>Use arrow keys to pan around</li>
+                    <li>Iframes are resizable using the bottom-right corner</li>
+                </ul>
+                <p style="margin-top:10px; color:#666;">Note: Some websites may not load due to security restrictions.</p>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button value="cancel" class="preset-button" style="background:#95a5a6">Close</button>
+            </div>
+        </form>
+    </dialog>
 
     <script src="custom.js"></script>
 </body>
