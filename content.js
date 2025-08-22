@@ -3,6 +3,33 @@
 
 console.log('Peripeek extension content script loaded');
 
+// Bridge: receive remove_selectors messages from extension page
+window.addEventListener('message', (event) => {
+  try {
+    // The source is null in extension contexts; check payload channel instead
+    const data = event.data || {};
+    if (data && data.channel === 'peripeek' && data.cmd === 'remove_selectors') {
+      const selectors = Array.isArray(data.selectors) ? data.selectors : [];
+      const seen = new Set();
+      const nuke = (root) => {
+        for (const sel of selectors) {
+          try {
+            const nodes = root.querySelectorAll(sel);
+            nodes.forEach((n) => {
+              if (!seen.has(n)) { seen.add(n); try { n.remove(); } catch { try { n.style.setProperty('display','none','important'); } catch {} } }
+            });
+          } catch {}
+        }
+      };
+      nuke(document);
+      // short observer to catch late mounts
+      const mo = new MutationObserver(() => nuke(document));
+      try { mo.observe(document.documentElement, { childList: true, subtree: true }); } catch {}
+      setTimeout(() => { try { mo.disconnect(); } catch {} }, 2000);
+    }
+  } catch {}
+}, false);
+
 // Keyboard event listener for pan/zoom keys
 document.addEventListener('keydown', (event) => {
   const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '+', '=', '-'];

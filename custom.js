@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const horizontalLayoutBtn = document.getElementById('horizontal-layout');
     const verticalLayoutBtn = document.getElementById('vertical-layout');
     const autoLayoutToggle = document.getElementById('auto-layout-toggle');
+    const bridgeSelectorsInput = document.getElementById('bridge-selectors');
+    const bridgeApplyBtn = document.getElementById('bridge-apply');
 
     // --- NATIVE ZOOM & PAN STATE ---
     let transform = {
@@ -183,6 +185,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (iframe.src !== 'about:blank') {
                     loadingDiv.textContent = '✓ Loaded';
                     loadingDiv.style.backgroundColor = 'rgba(76,175,80,0.8)';
+
+                    // After load, push removal to this iframe
+                    (async () => {
+                        try {
+                            const st = await chrome.storage.local.get([BRIDGE_SEL_KEY]);
+                            const raw = (st[BRIDGE_SEL_KEY] || '').trim();
+                            const selectors = raw.split(',').map(s => s.trim()).filter(Boolean);
+                            if (selectors.length) {
+                                try { iframe.contentWindow.postMessage({ channel: 'peripeek', cmd: 'remove_selectors', selectors }, '*'); } catch {}
+                            }
+                        } catch {}
+                    })();
+
                     setTimeout(() => {
                         loadingDiv.style.opacity = '0';
                         loadingDiv.style.transition = 'opacity 0.5s';
@@ -1233,6 +1248,30 @@ document.addEventListener('DOMContentLoaded', () => {
 	const DATA_INDEX_KEY = 'peripeek.data.index';
 	const DATA_FILE_PREFIX = 'peripeek.data.file:';
 	let lastFetchedSitemapXml = '';
+
+    const BRIDGE_SEL_KEY = 'peripeek.bridge.selectors';
+    (async () => {
+        try {
+            const st = await chrome.storage.local.get([BRIDGE_SEL_KEY]);
+            if (typeof st[BRIDGE_SEL_KEY] === 'string') bridgeSelectorsInput.value = st[BRIDGE_SEL_KEY];
+        } catch {}
+    })();
+
+    function broadcastRemoveSelectors(selectors) {
+        try {
+            const frames = document.querySelectorAll('.iframe-container iframe');
+            frames.forEach((fr) => {
+                try { fr.contentWindow.postMessage({ channel: 'peripeek', cmd: 'remove_selectors', selectors }, '*'); } catch {}
+            });
+        } catch {}
+    }
+
+    bridgeApplyBtn?.addEventListener('click', async () => {
+        const raw = (bridgeSelectorsInput.value || '').trim();
+        await chrome.storage.local.set({ [BRIDGE_SEL_KEY]: raw });
+        const selectors = raw.split(',').map(s => s.trim()).filter(Boolean);
+        broadcastRemoveSelectors(selectors);
+    });
 
 	async function readStorage(keys) {
 		return await chrome.storage.local.get(keys);
