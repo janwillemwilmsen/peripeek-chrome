@@ -1449,6 +1449,36 @@ document.addEventListener('DOMContentLoaded', () => {
 		renderSavedFilesList(await listDataFiles());
 	}
 
+    // Foldable groups
+    const FOLD_KEY = 'peripeek.fold';
+    const foldState = { };
+    const groups = Array.from(document.querySelectorAll('.settings-group'));
+    (async () => {
+        try {
+            const st = await chrome.storage.local.get([FOLD_KEY]);
+            const saved = st[FOLD_KEY] || {};
+            groups.forEach(g => {
+                const id = g.id || '';
+                const collapsed = !!saved[id];
+                if (collapsed) g.classList.add('collapsed');
+            });
+        } catch {}
+    })();
+    groups.forEach(g => {
+        const btn = g.querySelector('.fold-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            g.classList.toggle('collapsed');
+            try {
+                const st = await chrome.storage.local.get([FOLD_KEY]);
+                const saved = st[FOLD_KEY] || {};
+                const id = g.id || '';
+                saved[id] = g.classList.contains('collapsed');
+                await chrome.storage.local.set({ [FOLD_KEY]: saved });
+            } catch {}
+        });
+    });
+
     // --- INITIALIZATION ---
     console.log('🎯 Starting initialization...');
     loadSites();

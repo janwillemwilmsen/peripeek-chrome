@@ -128,24 +128,49 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 60px;
+            /* was: height: 60px; */
+            min-height: 60px;
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             border-bottom: 2px solid #34495e;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             z-index: 1001;
             display: flex;
-            align-items: center;
-            padding: 0 20px;
+            align-items: flex-start;
+            padding: 8px 12px; /* tighter padding for smaller widths */
             color: white;
             font-size: 14px;
-            gap: 20px;
+            gap: 16px;
+            flex-wrap: wrap; /* lay groups horizontally, wrap on small widths */
+            row-gap: 8px;
+            -webkit-overflow-scrolling: touch;
         }
         
         .settings-group {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding: 6px 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
         }
+        .settings-group .fold-toggle {
+            background: transparent;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            padding: 4px 6px;
+            opacity: 0.8;
+        }
+        .settings-group.collapsed .group-body { display: none; }
+        .settings-group .fold-toggle::after { content: '▾'; display: inline-block; transition: transform 0.15s ease; }
+        .settings-group.collapsed .fold-toggle::after { transform: rotate(-90deg); }
+        .settings-group .header { display:flex; align-items:center; gap:10px; cursor: pointer; }
+        .settings-group .group-body { display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
         
         .settings-label {
             font-weight: 500;
@@ -217,60 +242,99 @@
 <body>
     <!-- Settings bezel -->
     <div class="settings-bezel">
-        <div class="settings-group">
-            <span class="settings-label">Size:</span>
-            <input type="number" id="iframe-width" class="settings-input" placeholder="Width" value="800">
-            <span>×</span>
-            <input type="number" id="iframe-height" class="settings-input" placeholder="Height" value="600">
-            <button id="apply-size" class="preset-button">Apply</button>
+        <div class="settings-group" id="group-size">
+            <div class="header">
+                <span class="settings-label">Size:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <input type="number" id="iframe-width" class="settings-input" placeholder="Width" value="800">
+                <span>×</span>
+                <input type="number" id="iframe-height" class="settings-input" placeholder="Height" value="600">
+                <button id="apply-size" class="preset-button">Apply</button>
+            </div>
         </div>
         
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <span class="settings-label">Presets:</span>
-            <button class="preset-button" data-preset="mobile">📱 Mobile</button>
-            <button class="preset-button" data-preset="tablet">📱 Tablet</button>
-            <button class="preset-button" data-preset="desktop">🖥️ Desktop</button>
+        <div class="settings-group" id="group-presets">
+            <div class="header">
+                <span class="settings-label">Presets:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <button class="preset-button" data-preset="mobile">📱 Mobile</button>
+                <button class="preset-button" data-preset="tablet">📱 Tablet</button>
+                <button class="preset-button" data-preset="desktop">🖥️ Desktop</button>
+            </div>
         </div>
         
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <span class="settings-label">Remove:</span>
-            <input id="bridge-selectors" class="settings-input" placeholder=".cookie, #consent" style="width:220px" />
-            <button id="bridge-apply" class="preset-button">Apply</button>
+        <div class="settings-group" id="group-screenshot">
+            <div class="header">
+                <span class="settings-label">Screenshot:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <button id="capture-all" class="preset-button">📸 Capture All</button>
+                <button id="capture-all-mobile" class="preset-button">📱 Capture All Mobile</button>
+            </div>
         </div>
         
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <button id="capture-all" class="preset-button">📸 Capture All</button>
-            <button id="capture-all-mobile" class="preset-button">📱 Capture All Mobile</button>
+        <div class="settings-group" id="group-layout">
+            <div class="header">
+                <span class="settings-label">Layout:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <button id="grid-layout" class="preset-button">📦 Grid</button>
+                <button id="horizontal-layout" class="preset-button">↔️ Horizontal</button>
+                <button id="vertical-layout" class="preset-button">↕️ Vertical</button>
+                <button id="auto-layout-toggle" class="preset-button active">Auto on resize</button>
+            </div>
         </div>
         
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <span class="settings-label">Layout:</span>
-            <button id="grid-layout" class="preset-button">📦 Grid</button>
-            <button id="horizontal-layout" class="preset-button">↔️ Horizontal</button>
-            <button id="vertical-layout" class="preset-button">↕️ Vertical</button>
-            <button id="auto-layout-toggle" class="preset-button active">Auto on resize</button>
+        <div class="settings-group" id="group-urls">
+            <div class="header">
+                <span class="settings-label">URLs:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <button id="open-update-urls" class="preset-button">📝 Update URLs</button>
+            </div>
         </div>
         
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <span class="settings-label">URLs:</span>
-            <button id="open-update-urls" class="preset-button">📝 Update URLs</button>
+        <div class="settings-group" id="group-info">
+            <div class="header">
+                <span class="settings-label">Info:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <button id="open-info" class="preset-button">ℹ️ Info</button>
+            </div>
         </div>
-        
+
         <div class="divider"></div>
         
-        <div class="settings-group">
-            <button id="open-info" class="preset-button">ℹ️ Info</button>
+        <div class="settings-group" id="group-remove">
+            <div class="header">
+                <span class="settings-label">Remove:</span>
+                <button type="button" class="fold-toggle" aria-label="Toggle"></button>
+            </div>
+            <div class="group-body">
+                <input id="bridge-selectors" class="settings-input" placeholder=".cookie, #consent" style="width:220px" />
+                <button id="bridge-apply" class="preset-button">Apply</button>
+            </div>
         </div>
+
+        <div class="divider"></div>
     </div>
 
     <div id="viewport" tabindex="0">
