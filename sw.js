@@ -133,6 +133,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.onUpdated.addListener(listener);
         });
 
+        // Pull removal selectors configured in UI and prepare injector
+        const { ['peripeek.bridge.selectors']: selRaw } = await chrome.storage.local.get(['peripeek.bridge.selectors']);
+        const removalSelectors = (selRaw || '').split(',').map(s => s.trim()).filter(Boolean);
+        const removeFunc = (selectors) => {
+          try {
+            selectors.forEach((sel) => {
+              try {
+                const nodes = document.querySelectorAll(sel);
+                nodes.forEach((n) => {
+                  try { n.remove(); } catch { try { n.style.setProperty('display','none','important'); } catch {} }
+                });
+              } catch {}
+            });
+          } catch {}
+        };
+        const execRemove = async () => {
+          if (!removalSelectors.length) return;
+          try { await chrome.scripting.executeScript({ target: { tabId: tempTabId }, func: removeFunc, args: [removalSelectors] }); } catch {}
+        };
+
         // Try CDP viewport scrolling + capture (no clip) to avoid site reactions and repeats
         let cdpImages;
         try {
@@ -189,6 +209,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // Try single full-page capture to avoid seams entirely
           try {
             await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
+            await execRemove();
             await new Promise(r => setTimeout(r, 300));
             const capFull = await dbg.send(tempTabId, 'Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: true });
             if (capFull && capFull.data) {
@@ -203,6 +224,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           // Ensure top
           await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'window.scrollTo(0,0)' });
+          await execRemove();
           await new Promise(r => setTimeout(r, 300));
           cdpImages = [];
           // Capture top with sticky elements visible once
@@ -239,6 +261,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           for (let idx = 0; idx < uniqYs.length; idx++) {
             const targetY = uniqYs[idx];
             await dbg.send(tempTabId, 'Runtime.evaluate', { expression: `window.scrollTo(0, ${targetY})` });
+            await execRemove();
             await new Promise(r => setTimeout(r, 400));
             const evalRes = await dbg.send(tempTabId, 'Runtime.evaluate', { expression: 'Math.floor(window.scrollY)||0' });
             const curY = (evalRes && evalRes.result && typeof evalRes.result.value === 'number') ? evalRes.result.value : targetY;
