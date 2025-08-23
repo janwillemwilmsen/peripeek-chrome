@@ -316,9 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
                                 const png = c.toDataURL('image/png');
                                 const a = document.createElement('a');
-                                const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                                const u = new URL(site.url);
+                                const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                                const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                                const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                                 const ts = new Date().toISOString().replace(/[:.]/g, '-');
-                                a.href = png; a.download = `${host}-${ts}.png`; document.body.appendChild(a); a.click(); a.remove();
+                                a.href = png; a.download = `${host}__${path}${qh ? '__'+qh : ''}__${ts}.png`; document.body.appendChild(a); a.click(); a.remove();
                             };
                             img.src = dataUrl;
                         });
@@ -327,10 +330,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Single full-page image path
                     if (response.cdp && response.single && response.image) {
                         const a = document.createElement('a');
-                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const u = new URL(site.url);
+                        const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                        const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                        const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                         const ts = new Date().toISOString().replace(/[:.]/g, '-');
                         a.href = response.image;
-                        a.download = `${host}-fullpage-${ts}.png`;
+                        a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage__${ts}.png`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -358,10 +364,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         const png = canvasShot.toDataURL('image/png');
                         const a = document.createElement('a');
-                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const u = new URL(site.url);
+                        const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                        const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                        const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                         const ts = new Date().toISOString().replace(/[:.]/g, '-');
                         a.href = png;
-                        a.download = `${host}-fullpage-${ts}.png`;
+                        a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage__${ts}.png`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -456,10 +465,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const png = canvasShot.toDataURL('image/png');
                         const a = document.createElement('a');
-                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const u = new URL(site.url);
+                        const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                        const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                        const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                         const ts = new Date().toISOString().replace(/[:.]/g, '-');
                         a.href = png;
-                        a.download = `${host}-fullpage-${ts}.png`;
+                        a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage__${ts}.png`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -493,10 +505,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const png = canvasShot.toDataURL('image/png');
                     const a = document.createElement('a');
-                    const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                    const u = new URL(site.url);
+                    const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                    const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                    const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                     const ts = new Date().toISOString().replace(/[:.]/g, '-');
                     a.href = png;
-                    a.download = `${host}-fullpage-${ts}.png`;
+                    a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage__${ts}.png`;
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
@@ -541,9 +556,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
                                 const png = c.toDataURL('image/png');
                                 const a = document.createElement('a');
-                                const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                                const u = new URL(site.url);
+                                const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                                const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                                const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                                 const ts = new Date().toISOString().replace(/[:.]/g, '-');
-                                a.href = png; a.download = `${host}-mobile-${ts}.png`; document.body.appendChild(a); a.click(); a.remove();
+                                a.href = png; a.download = `${host}__${path}${qh ? '__'+qh : ''}__mobile__${ts}.png`; document.body.appendChild(a); a.click(); a.remove();
                             };
                             img.src = dataUrl;
                         });
@@ -551,10 +569,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (response.cdp && response.single && response.image) {
                         const a = document.createElement('a');
-                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const u = new URL(site.url);
+                        const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                        const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                        const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                         const ts = new Date().toISOString().replace(/[:.]/g, '-');
                         a.href = response.image;
-                        a.download = `${host}-fullpage-mobile-${ts}.png`;
+                        a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage-mobile__${ts}.png`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -581,10 +602,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         const png = canvasShot.toDataURL('image/png');
                         const a = document.createElement('a');
-                        const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                        const u = new URL(site.url);
+                        const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                        const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                        const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                         const ts = new Date().toISOString().replace(/[:.]/g, '-');
                         a.href = png;
-                        a.download = `${host}-fullpage-mobile-${ts}.png`;
+                        a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage-mobile__${ts}.png`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -616,10 +640,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const png = canvasShot.toDataURL('image/png');
                     const a = document.createElement('a');
-                    const host = (() => { try { return new URL(site.url).host; } catch { return 'iframe'; } })();
+                    const u = new URL(site.url);
+                    const host = u.host.replace(/[^a-z0-9.-]/gi,'_');
+                    const path = (u.pathname || '/').replace(/\/+$/,'').replace(/[^a-z0-9._/-]/gi,'_').replace(/\//g,'-') || 'root';
+                    const qh = u.search ? ('q' + btoa(u.search).replace(/[^a-z0-9]/gi,'').slice(0,12)) : '';
                     const ts = new Date().toISOString().replace(/[:.]/g, '-');
                     a.href = png;
-                    a.download = `${host}-fullpage-mobile-${ts}.png`;
+                    a.download = `${host}__${path}${qh ? '__'+qh : ''}__fullpage-mobile__${ts}.png`;
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
